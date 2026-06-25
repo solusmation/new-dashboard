@@ -454,6 +454,48 @@ export type Database = {
         }
         Relationships: []
       }
+      fnb_menu_items: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          image_storage_path: string | null
+          image_url: string | null
+          is_available: boolean
+          name: string
+          price_idr: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string
+          id?: string
+          image_storage_path?: string | null
+          image_url?: string | null
+          is_available?: boolean
+          name: string
+          price_idr: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          image_storage_path?: string | null
+          image_url?: string | null
+          is_available?: boolean
+          name?: string
+          price_idr?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       gold_member_promo_codes: {
         Row: {
           assigned_at: string
@@ -2044,6 +2086,118 @@ export type Database = {
           },
         ]
       }
+      transaksi_fnb: {
+        Row: {
+          court_number: number | null
+          created_at: string
+          fnb_order_id: string | null
+          id: string
+          metode_pembayaran_id: string | null
+          notes: string | null
+          status: string
+          total_amount_idr: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          court_number?: number | null
+          created_at?: string
+          fnb_order_id?: string | null
+          id?: string
+          metode_pembayaran_id?: string | null
+          notes?: string | null
+          status?: string
+          total_amount_idr: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          court_number?: number | null
+          created_at?: string
+          fnb_order_id?: string | null
+          id?: string
+          metode_pembayaran_id?: string | null
+          notes?: string | null
+          status?: string
+          total_amount_idr?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaksi_fnb_fnb_order_id_fkey"
+            columns: ["fnb_order_id"]
+            isOneToOne: false
+            referencedRelation: "fnb_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaksi_fnb_metode_pembayaran_id_fkey"
+            columns: ["metode_pembayaran_id"]
+            isOneToOne: false
+            referencedRelation: "metode_pembayaran"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaksi_fnb_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      transaksi_fnb_items: {
+        Row: {
+          created_at: string
+          fnb_menu_item_id: string | null
+          id: string
+          menu_category: string
+          menu_name: string
+          quantity: number
+          subtotal_idr: number
+          transaksi_fnb_id: string
+          unit_price_idr: number
+        }
+        Insert: {
+          created_at?: string
+          fnb_menu_item_id?: string | null
+          id?: string
+          menu_category: string
+          menu_name: string
+          quantity: number
+          subtotal_idr: number
+          transaksi_fnb_id: string
+          unit_price_idr: number
+        }
+        Update: {
+          created_at?: string
+          fnb_menu_item_id?: string | null
+          id?: string
+          menu_category?: string
+          menu_name?: string
+          quantity?: number
+          subtotal_idr?: number
+          transaksi_fnb_id?: string
+          unit_price_idr?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaksi_fnb_items_fnb_menu_item_id_fkey"
+            columns: ["fnb_menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "fnb_menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaksi_fnb_items_transaksi_fnb_id_fkey"
+            columns: ["transaksi_fnb_id"]
+            isOneToOne: false
+            referencedRelation: "transaksi_fnb"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_prizes: {
         Row: {
           claim_code: string
@@ -3087,6 +3241,14 @@ export type Database = {
         Returns: undefined
       }
       purge_noncompliant_matches: { Args: never; Returns: number }
+      place_fnb_order: {
+        Args: {
+          p_items: Json
+          p_metode_pembayaran_id?: string
+          p_notes?: string
+        }
+        Returns: string
+      }
       purge_program_transaksi: {
         Args: { p_program_id: string }
         Returns: undefined
@@ -3328,6 +3490,10 @@ export type Database = {
           p_match_id: string
           p_scheduled_at: string
         }
+        Returns: undefined
+      }
+      update_transaksi_fnb_status: {
+        Args: { p_status: string; p_transaksi_fnb_id: string }
         Returns: undefined
       }
       upsert_coach_date_override: {

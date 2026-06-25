@@ -1,0 +1,33 @@
+-- Seed menu FnB (Makanan = food, Minuman = drink). Tanpa gambar, semua tersedia.
+
+INSERT INTO public.fnb_menu_items (name, category, price_idr, description, image_url, is_available, sort_order)
+VALUES
+  ('Mi Goreng Rendang', 'food', 25000, '', NULL, true, 1),
+  ('QQ Cassava Chips', 'food', 20000, '', NULL, true, 2),
+  ('QQ Fruit Mix', 'food', 30000, '', NULL, true, 3),
+  ('QQ Tempe', 'food', 20000, '', NULL, true, 4),
+  ('Seolmi Chocolate', 'food', 25000, '', NULL, true, 5),
+  ('Seolmi Strawberry', 'food', 25000, '', NULL, true, 6),
+  ('Seolmi Vanilla', 'food', 28000, '', NULL, true, 7),
+  ('Seolmi Trial Kit', 'food', 119000, '', NULL, true, 8),
+  ('Aquviva', 'drink', 10000, '', NULL, true, 9),
+  ('Isoplus', 'drink', 10000, '', NULL, true, 10),
+  ('Isoplus Coco', 'drink', 10000, '', NULL, true, 11),
+  ('% One Protein Lemon', 'drink', 36500, '', NULL, true, 12),
+  ('% One Protein Strawberry', 'drink', 36500, '', NULL, true, 13),
+  ('% One Protein Coklat', 'drink', 26500, '', NULL, true, 14),
+  ('Druppes', 'drink', 36000, '', NULL, true, 15),
+  ('Degan', 'drink', 30000, '', NULL, true, 16),
+  ('Bir Draft', 'drink', 35000, '', NULL, true, 17),
+  ('Bir Bintang', 'drink', 38000, '', NULL, true, 18),
+  ('Guinnes', 'drink', 50000, '', NULL, true, 19),
+  ('Soju Wija (Lecy, Pineapple, Lemon, Mango)', 'drink', 35000, '', NULL, true, 20),
+  ('Island Brewing Small Hazy', 'drink', 55000, '', NULL, true, 21),
+  ('Island Brewing Summer Pale Ale', 'drink', 45000, '', NULL, true, 22),
+  ('Island Brewing Pilsner', 'drink', 45000, '', NULL, true, 23),
+  ('Island Brewing Light Lager', 'drink', 32000, '', NULL, true, 24),
+  ('Kura Kura Lager', 'drink', 50000, '', NULL, true, 25),
+  ('Kura Kura Session Hazy', 'drink', 55000, '', NULL, true, 26),
+  ('Kura Kura Island Ale', 'drink', 60000, '', NULL, true, 27),
+  ('Beaches Cerveza', 'drink', 40000, '', NULL, true, 28),
+  ('Beaches Pale Ale', 'drink', 50000, '', NULL, true, 29);

@@ -10,6 +10,7 @@ import {
   BookOpen,
   Swords,
   Trophy,
+  UtensilsCrossed,
   Bell,
   Settings,
   LogOut,
@@ -36,6 +37,7 @@ const groups: ReadonlyArray<{
       { to: "/admin/program", label: "Program", icon: BookOpen },
       { to: "/admin/match", label: "Match", icon: Swords },
       { to: "/admin/tournament", label: "Tournament", icon: Trophy },
+      { to: "/admin/fnb", label: "FnB", icon: UtensilsCrossed },
     ],
   },
   {
