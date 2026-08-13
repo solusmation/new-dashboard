@@ -430,6 +430,47 @@ export type Database = {
         }
         Relationships: []
       }
+      court_occupancy_manual: {
+        Row: {
+          booking_date: string
+          category: string
+          created_at: string
+          hour: number
+          id: string
+          manual_courts: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          booking_date: string
+          category: string
+          created_at?: string
+          hour: number
+          id?: string
+          manual_courts?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          booking_date?: string
+          category?: string
+          created_at?: string
+          hour?: number
+          id?: string
+          manual_courts?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "court_occupancy_manual_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       daily_signins: {
         Row: {
           coins_earned: number

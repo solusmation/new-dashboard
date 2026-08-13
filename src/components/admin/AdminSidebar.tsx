@@ -31,13 +31,13 @@ const groups: ReadonlyArray<{
     label: "Operasional",
     items: [
       { to: "/admin/keuangan", label: "Keuangan", icon: LayoutGrid },
-      { to: "/admin/pengguna", label: "Pengguna", icon: Users },
-      { to: "/admin/coach", label: "Coach", icon: GraduationCap },
+      { to: "/admin/fnb", label: "FnB", icon: UtensilsCrossed },
+      { to: "/admin/tournament", label: "Tournament", icon: Trophy },
       { to: "/admin/reservasi", label: "Reservasi", icon: CalendarDays },
       { to: "/admin/program", label: "Program", icon: BookOpen },
       { to: "/admin/match", label: "Match", icon: Swords },
-      { to: "/admin/tournament", label: "Tournament", icon: Trophy },
-      { to: "/admin/fnb", label: "FnB", icon: UtensilsCrossed },
+      { to: "/admin/coach", label: "Coach", icon: GraduationCap },
+      { to: "/admin/pengguna", label: "Pengguna", icon: Users },
     ],
   },
   {

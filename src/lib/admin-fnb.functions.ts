@@ -144,6 +144,8 @@ export const uploadFnbMenuImage = createServerFn({ method: "POST" })
     };
   });
 
+const ymdRegex = /^\d{4}-\d{2}-\d{2}$/;
+
 function jakartaDayStartIso(ymd: string): string {
   return new Date(`${ymd}T00:00:00+07:00`).toISOString();
 }
@@ -158,10 +160,10 @@ export const listTransaksiFnb = createServerFn({ method: "GET" })
     z
       .object({
         limit: z.number().int().min(1).max(200).optional().default(100),
-        date: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/)
-          .optional(),
+        /** Single day (legacy). Prefer dateFrom/dateTo for ranges. */
+        date: z.string().regex(ymdRegex).optional(),
+        dateFrom: z.string().regex(ymdRegex).optional(),
+        dateTo: z.string().regex(ymdRegex).optional(),
       })
       .parse(input ?? {}),
   )
@@ -198,10 +200,13 @@ export const listTransaksiFnb = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(data.limit);
 
-    if (data.date) {
-      query = query
-        .gte("created_at", jakartaDayStartIso(data.date))
-        .lte("created_at", jakartaDayEndIso(data.date));
+    const from = data.dateFrom ?? data.date;
+    const to = data.dateTo ?? data.date;
+    if (from) {
+      query = query.gte("created_at", jakartaDayStartIso(from));
+    }
+    if (to) {
+      query = query.lte("created_at", jakartaDayEndIso(to));
     }
 
     const { data: rows, error } = await query;

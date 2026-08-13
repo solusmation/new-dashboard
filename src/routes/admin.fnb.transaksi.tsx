@@ -2,9 +2,19 @@ import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
+import { SlidersHorizontal } from "lucide-react";
 import { FNB_CATEGORY_LABELS, listTransaksiFnb } from "@/lib/admin-fnb.functions";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/admin/fnb/transaksi")({
   component: FnbTransaksiPage,
@@ -24,6 +34,22 @@ const fmtDate = (iso: string) =>
     timeZone: "Asia/Jakarta",
   }).format(new Date(iso));
 
+const fmtYmdLabel = (ymd: string) =>
+  new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  }).format(new Date(`${ymd}T12:00:00+07:00`));
+
+const fmtMonthLabel = (monthYm: string) => {
+  const [y, m] = monthYm.split("-").map((x) => parseInt(x, 10));
+  return new Intl.DateTimeFormat("id-ID", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(Date.UTC(y, m - 1, 1)));
+};
+
 function todayYmdJakarta(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
@@ -32,6 +58,14 @@ function todayYmdJakarta(): string {
     day: "2-digit",
   }).format(new Date());
 }
+
+function monthLastDayYmd(monthYm: string): string {
+  const [y, m] = monthYm.split("-").map((x) => parseInt(x, 10));
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${y}-${String(m).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+}
+
+type DateFilterMode = "day" | "month" | "range";
 
 type TxRow = {
   id: string;
@@ -53,21 +87,64 @@ type TxRow = {
 
 function FnbTransaksiPage() {
   const fetchTx = useServerFn(listTransaksiFnb);
-  const [selectedDate, setSelectedDate] = React.useState(todayYmdJakarta());
+  const today = todayYmdJakarta();
+  const [filterOpen, setFilterOpen] = React.useState(false);
+  const [mode, setMode] = React.useState<DateFilterMode>("day");
+  const [selectedDate, setSelectedDate] = React.useState(today);
+  const [selectedMonth, setSelectedMonth] = React.useState(today.slice(0, 7));
+  const [dateFrom, setDateFrom] = React.useState(today);
+  const [dateTo, setDateTo] = React.useState(today);
+
+  const range = React.useMemo(() => {
+    if (mode === "day") {
+      return { from: selectedDate, to: selectedDate };
+    }
+    if (mode === "month") {
+      return {
+        from: `${selectedMonth}-01`,
+        to: monthLastDayYmd(selectedMonth),
+      };
+    }
+    const from = dateFrom <= dateTo ? dateFrom : dateTo;
+    const to = dateFrom <= dateTo ? dateTo : dateFrom;
+    return { from, to };
+  }, [mode, selectedDate, selectedMonth, dateFrom, dateTo]);
+
+  const filterLabel = React.useMemo(() => {
+    if (mode === "day") {
+      return selectedDate === today ? "Hari ini" : fmtYmdLabel(selectedDate);
+    }
+    if (mode === "month") {
+      return fmtMonthLabel(selectedMonth);
+    }
+    if (range.from === range.to) {
+      return fmtYmdLabel(range.from);
+    }
+    return `${fmtYmdLabel(range.from)} – ${fmtYmdLabel(range.to)}`;
+  }, [mode, selectedDate, selectedMonth, range.from, range.to, today]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin", "fnb", "transaksi", selectedDate],
+    queryKey: ["admin", "fnb", "transaksi", mode, range.from, range.to],
     queryFn: () =>
       fetchTx({
         data: {
           limit: 200,
-          date: selectedDate,
+          dateFrom: range.from,
+          dateTo: range.to,
         },
       }),
+    enabled: Boolean(range.from && range.to),
   });
 
   const rows = (data?.transactions ?? []) as TxRow[];
   const summary = data?.summary ?? { totalAll: 0, totalToday: 0 };
+
+  const emptyMessage =
+    mode === "month"
+      ? "Tidak ada transaksi FnB pada bulan ini."
+      : mode === "range"
+        ? "Tidak ada transaksi FnB pada rentang tanggal ini."
+        : "Tidak ada transaksi FnB pada tanggal ini.";
 
   return (
     <div className="space-y-6">
@@ -87,18 +164,109 @@ function FnbTransaksiPage() {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="fnb-date" className="text-xs">
-            Tanggal
-          </Label>
-          <Input
-            id="fnb-date"
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-[160px]"
-          />
-        </div>
+        <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="max-w-[220px] truncate">{filterLabel}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            className="w-[300px] space-y-4 p-4"
+            onInteractOutside={(e) => {
+              const target = e.target as HTMLElement | null;
+              if (target?.closest("[data-radix-select-content]")) {
+                e.preventDefault();
+              }
+            }}
+          >
+            <div>
+              <div className="text-sm font-medium">Filter tanggal</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Pilih per hari, per bulan, atau rentang tanggal.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Jenis filter</Label>
+              <Select value={mode} onValueChange={(v) => setMode(v as DateFilterMode)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Per hari</SelectItem>
+                  <SelectItem value="month">Per bulan</SelectItem>
+                  <SelectItem value="range">Rentang tanggal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {mode === "day" ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="fnb-date" className="text-xs">
+                  Tanggal
+                </Label>
+                <Input
+                  id="fnb-date"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+                />
+              </div>
+            ) : null}
+
+            {mode === "month" ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="fnb-month" className="text-xs">
+                  Bulan
+                </Label>
+                <Input
+                  id="fnb-month"
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
+                />
+              </div>
+            ) : null}
+
+            {mode === "range" ? (
+              <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="fnb-date-from" className="text-xs">
+                    Dari tanggal
+                  </Label>
+                  <Input
+                    id="fnb-date-from"
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => e.target.value && setDateFrom(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="fnb-date-to" className="text-xs">
+                    Sampai tanggal
+                  </Label>
+                  <Input
+                    id="fnb-date-to"
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => e.target.value && setDateTo(e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <Button
+              type="button"
+              size="sm"
+              className="w-full"
+              onClick={() => setFilterOpen(false)}
+            >
+              Terapkan
+            </Button>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="space-y-4">
@@ -150,7 +318,7 @@ function FnbTransaksiPage() {
 
         {!isLoading && rows.length === 0 && (
           <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
-            Tidak ada transaksi FnB pada tanggal ini.
+            {emptyMessage}
           </div>
         )}
       </div>

@@ -1131,18 +1131,58 @@ export const getFinanceReservasiAnalytics = createServerFn({ method: "POST" })
     };
   });
 
-/** Okupansi lapangan: 4 court, persen terisi per jam (1 court = 25%, 4 = 100%). */
-const OCCUPANCY_COURT_COUNT = 4;
+/** Okupansi lapangan: 8 court; sel jam = jumlah court terisi (0–8), rata-rata harian = persen. */
+const OCCUPANCY_COURT_COUNT = 8;
 /** Jam operasional: 06:00 hingga tengah malam (00:00) = slot jam 06–23. */
 const OCCUPANCY_HOUR_START = 6;
 const OCCUPANCY_HOUR_END = 24;
 const OCCUPANCY_HOURS_LABEL = "06:00–00:00";
+
+export const OCCUPANCY_CATEGORIES = [
+  "ayo",
+  "payment_link",
+  "tunai",
+  "unpaid",
+  "event",
+  "free",
+] as const;
+
+export type OccupancyCategory = (typeof OCCUPANCY_CATEGORIES)[number];
+
+export const OCCUPANCY_CATEGORY_LABELS: Record<OccupancyCategory, string> = {
+  ayo: "Reguler melalui AYO",
+  payment_link: "Reguler melalui Payment Link",
+  tunai: "Reguler melalui Tunai",
+  unpaid: "Booking belum bayar",
+  event: "Event",
+  free: "Free & Kompensasi",
+};
+
+/** Warna dasar kategori untuk pewarnaan sel & indikator dropdown. */
+export const OCCUPANCY_CATEGORY_COLORS: Record<
+  OccupancyCategory,
+  { hue: number; sat: number; light: number }
+> = {
+  ayo: { hue: 142, sat: 55, light: 38 },
+  payment_link: { hue: 48, sat: 90, light: 45 },
+  tunai: { hue: 28, sat: 85, light: 48 },
+  unpaid: { hue: 220, sat: 8, light: 48 },
+  event: { hue: 210, sat: 75, light: 48 },
+  free: { hue: 330, sat: 70, light: 55 },
+};
 
 type OccupancyBookingRow = {
   booking_date: string;
   start_time: string;
   duration_hours: number;
   court_numbers: number[];
+};
+
+type OccupancyManualRow = {
+  booking_date: string;
+  hour: number;
+  manual_courts: number;
+  category: string;
 };
 
 function hourInJakarta(d: Date): number {
@@ -1237,6 +1277,7 @@ function buildCourtOccupancyAnalytics(
   rows: OccupancyBookingRow[],
   dateFrom: string,
   dateTo: string,
+  manualRows: OccupancyManualRow[] = [],
 ) {
   const hours = Array.from(
     { length: OCCUPANCY_HOUR_END - OCCUPANCY_HOUR_START },
@@ -1274,16 +1315,42 @@ function buildCourtOccupancyAnalytics(
     }
   }
 
-  const grid = hours.map((hour) =>
-    dates.map((ymd) => {
-      const n = slotCourts.get(ymd)?.get(hour)?.size ?? 0;
-      return roundPct((n / OCCUPANCY_COURT_COUNT) * 100);
-    }),
+  const memberGrid = hours.map((hour) =>
+    dates.map((ymd) => slotCourts.get(ymd)?.get(hour)?.size ?? 0),
+  );
+
+  const manualMap = new Map<string, { manual_courts: number; category: OccupancyCategory }>();
+  for (const m of manualRows) {
+    if (m.booking_date < dateFrom || m.booking_date > dateTo) continue;
+    if (m.hour < OCCUPANCY_HOUR_START || m.hour >= OCCUPANCY_HOUR_END) continue;
+    const cat = OCCUPANCY_CATEGORIES.includes(m.category as OccupancyCategory)
+      ? (m.category as OccupancyCategory)
+      : "ayo";
+    manualMap.set(`${m.booking_date}|${m.hour}`, {
+      manual_courts: Math.max(0, Math.floor(Number(m.manual_courts) || 0)),
+      category: cat,
+    });
+  }
+
+  const manualGrid = hours.map((hour) =>
+    dates.map((ymd) => manualMap.get(`${ymd}|${hour}`)?.manual_courts ?? 0),
+  );
+
+  const categoryGrid = hours.map((hour) =>
+    dates.map((ymd) => manualMap.get(`${ymd}|${hour}`)?.category ?? null),
+  );
+
+  const grid = hours.map((_, hi) =>
+    dates.map((_, di) =>
+      Math.min(OCCUPANCY_COURT_COUNT, memberGrid[hi][di] + manualGrid[hi][di]),
+    ),
   );
 
   const dailyAvgPct = dates.map((_, di) => {
-    const sum = hours.reduce((acc, _, hi) => acc + grid[hi][di], 0);
-    return roundPct(sum / hours.length);
+    const sumPct = hours.reduce((acc, _, hi) => {
+      return acc + (grid[hi][di] / OCCUPANCY_COURT_COUNT) * 100;
+    }, 0);
+    return roundPct(sumPct / hours.length);
   });
 
   const weekBuckets = new Map<string, { label: string; values: number[] }>();
@@ -1338,6 +1405,9 @@ function buildCourtOccupancyAnalytics(
     hours,
     dates,
     grid,
+    memberGrid,
+    manualGrid,
+    categoryGrid,
     dailyAvgPct,
     weeklyAvgs,
     monthlyAvgs,
@@ -1389,33 +1459,52 @@ export const getFinanceOkupansiAnalytics = createServerFn({ method: "POST" })
     const aggregateMonths = data.aggregateMonths ?? 12;
 
     const monthFrom = `${tableMonth}-01`;
-    let monthTo = monthLastDayYmd(tableMonth);
+    const monthLast = monthLastDayYmd(tableMonth);
     const todayYmd = ymdInJakarta(new Date().toISOString());
-    if (monthTo > todayYmd) monthTo = todayYmd;
+    /** Grid selalu menampilkan seluruh hari di bulan terpilih (termasuk kosong / masa depan). */
+    const tableTo = monthLast;
+    /** Rata-rata & agregat grafik hanya sampai hari ini agar hari kosong di masa depan tidak menekan angka. */
+    const aggTo = monthLast > todayYmd ? todayYmd : monthLast;
 
     const aggStartMonth = addCalendarMonthsYmd(tableMonth, -(aggregateMonths - 1));
     let aggFrom = `${aggStartMonth}-01`;
-    const aggTo = monthTo;
 
     const thisWeekMon = mondayYmdOf(todayYmd);
     const weekDataFrom = addDaysYmd(thisWeekMon, -7);
     if (weekDataFrom < aggFrom) aggFrom = weekDataFrom;
 
-    const { data: rows, error } = await supabaseAdmin
-      .from("court_bookings")
-      .select("booking_date, start_time, duration_hours, court_numbers")
-      .gte("booking_date", aggFrom)
-      .lte("booking_date", todayYmd);
+    const fetchTo = tableTo >= todayYmd ? tableTo : todayYmd;
+
+    const [{ data: rows, error }, { data: manualRowsRaw, error: manualErr }] = await Promise.all([
+      supabaseAdmin
+        .from("court_bookings")
+        .select("booking_date, start_time, duration_hours, court_numbers")
+        .gte("booking_date", aggFrom)
+        .lte("booking_date", fetchTo),
+      supabaseAdmin
+        .from("court_occupancy_manual")
+        .select("booking_date, hour, manual_courts, category")
+        .gte("booking_date", aggFrom)
+        .lte("booking_date", fetchTo),
+    ]);
 
     if (error) throw new Error(error.message);
+    if (manualErr) throw new Error(manualErr.message);
 
     const bookingRows = (rows ?? []) as OccupancyBookingRow[];
-    const table = buildCourtOccupancyAnalytics(bookingRows, monthFrom, monthTo);
-    const aggregates = buildCourtOccupancyAnalytics(bookingRows, aggFrom, aggTo);
+    const manualRows = (manualRowsRaw ?? []) as OccupancyManualRow[];
+    const table = buildCourtOccupancyAnalytics(bookingRows, monthFrom, tableTo, manualRows);
+    const aggregates = buildCourtOccupancyAnalytics(bookingRows, aggFrom, aggTo, manualRows);
 
+    const elapsedDayIndexes = table.dates
+      .map((d, i) => (d <= todayYmd ? i : -1))
+      .filter((i) => i >= 0);
     const monthAvgPct =
-      table.dailyAvgPct.length > 0
-        ? roundPct(table.dailyAvgPct.reduce((a, b) => a + b, 0) / table.dailyAvgPct.length)
+      elapsedDayIndexes.length > 0
+        ? roundPct(
+            elapsedDayIndexes.reduce((a, i) => a + table.dailyAvgPct[i], 0) /
+              elapsedDayIndexes.length,
+          )
         : 0;
 
     const dailyByDate = new Map<string, number>();
@@ -1428,7 +1517,7 @@ export const getFinanceOkupansiAnalytics = createServerFn({ method: "POST" })
       tableMonth,
       tableMonthLabel: monthLabelId(tableMonth),
       monthFrom,
-      monthTo,
+      monthTo: tableTo,
       monthAvgPct,
       hoursLabel: OCCUPANCY_HOURS_LABEL,
       aggregateMonths,
@@ -1437,5 +1526,73 @@ export const getFinanceOkupansiAnalytics = createServerFn({ method: "POST" })
       table,
       weeklySnapshot,
       monthlyAvgs: aggregates.monthlyAvgs,
+      categories: OCCUPANCY_CATEGORIES.map((id) => ({
+        id,
+        label: OCCUPANCY_CATEGORY_LABELS[id],
+      })),
+    };
+  });
+
+const occupancyCategorySchema = z.enum(OCCUPANCY_CATEGORIES);
+
+export const upsertCourtOccupancyManual = createServerFn({ method: "POST" })
+  .middleware([requireSuperadminAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        hour: z.number().int().min(OCCUPANCY_HOUR_START).max(OCCUPANCY_HOUR_END - 1),
+        manualCourts: z.number().int().min(0).max(OCCUPANCY_COURT_COUNT),
+        category: occupancyCategorySchema,
+        /** Jumlah court dari booking member (untuk validasi sisi server). */
+        memberCourts: z.number().int().min(0).max(OCCUPANCY_COURT_COUNT),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const memberCourts = Math.min(OCCUPANCY_COURT_COUNT, Math.max(0, data.memberCourts));
+    const maxManual = Math.max(0, OCCUPANCY_COURT_COUNT - memberCourts);
+    const manualCourts = Math.min(maxManual, Math.max(0, data.manualCourts));
+
+    if (manualCourts === 0 && (memberCourts === 0 || data.category === "ayo")) {
+      const { error } = await supabaseAdmin
+        .from("court_occupancy_manual")
+        .delete()
+        .eq("booking_date", data.bookingDate)
+        .eq("hour", data.hour);
+      if (error) throw new Error(error.message);
+      return {
+        bookingDate: data.bookingDate,
+        hour: data.hour,
+        manualCourts: 0,
+        category: null as OccupancyCategory | null,
+        deleted: true,
+      };
+    }
+
+    const { data: row, error } = await supabaseAdmin
+      .from("court_occupancy_manual")
+      .upsert(
+        {
+          booking_date: data.bookingDate,
+          hour: data.hour,
+          manual_courts: manualCourts,
+          category: data.category,
+          updated_by: context.userId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "booking_date,hour" },
+      )
+      .select("booking_date, hour, manual_courts, category")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    return {
+      bookingDate: row.booking_date,
+      hour: row.hour,
+      manualCourts: row.manual_courts,
+      category: row.category as OccupancyCategory,
+      deleted: false,
     };
   });
