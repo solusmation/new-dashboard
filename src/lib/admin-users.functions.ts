@@ -296,6 +296,52 @@ export const updateProfileRole = createServerFn({ method: "POST" })
     return { ok: true, userId: data.userId, role };
   });
 
+export const MEMBERSHIP_TIERS = ["basic", "gold"] as const;
+export type MembershipTier = (typeof MEMBERSHIP_TIERS)[number];
+
+export const updateProfileMembership = createServerFn({ method: "POST" })
+  .middleware([requireSuperadminAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        userId: z.string().uuid(),
+        membershipTier: z.enum(MEMBERSHIP_TIERS),
+      })
+      .parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    await assertSuperadmin(context.userId);
+
+    const { data: target, error: fetchErr } = await supabaseAdmin
+      .from("profiles")
+      .select("user_id, membership_tier")
+      .eq("user_id", data.userId)
+      .maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!target) throw new Error("Profil pengguna tidak ditemukan.");
+
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        membership_tier: data.membershipTier,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", data.userId);
+    if (error) throw new Error(error.message);
+
+    if (data.membershipTier === "gold") {
+      const { error: entitleErr } = await supabaseAdmin.rpc("_ensure_gold_voucher_entitlements", {
+        p_user_id: data.userId,
+        p_gold_started_at: new Date().toISOString(),
+      });
+      if (entitleErr) {
+        console.error("[updateProfileMembership] gold entitlements:", entitleErr.message);
+      }
+    }
+
+    return { ok: true, userId: data.userId, membershipTier: data.membershipTier };
+  });
+
 export const getUsersEligibleForInstructor = createServerFn({ method: "GET" })
   .middleware([requireSuperadminAuth])
   .handler(async ({ context }) => {

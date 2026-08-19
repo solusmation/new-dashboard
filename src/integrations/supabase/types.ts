@@ -333,6 +333,7 @@ export type Database = {
       }
       coaches: {
         Row: {
+          avatar_storage_path: string | null
           avatar_url: string | null
           avg_rating: number
           bio: string | null
@@ -346,11 +347,13 @@ export type Database = {
           id: string
           min_booking_lead_minutes: number
           open_to_book: boolean
+          court_fee_included: boolean
           specialty: string | null
           total_raters: number
           user_id: string
         }
         Insert: {
+          avatar_storage_path?: string | null
           avatar_url?: string | null
           avg_rating?: number
           bio?: string | null
@@ -364,11 +367,13 @@ export type Database = {
           id?: string
           min_booking_lead_minutes?: number
           open_to_book?: boolean
+          court_fee_included?: boolean
           specialty?: string | null
           total_raters?: number
           user_id: string
         }
         Update: {
+          avatar_storage_path?: string | null
           avatar_url?: string | null
           avg_rating?: number
           bio?: string | null
@@ -382,6 +387,7 @@ export type Database = {
           id?: string
           min_booking_lead_minutes?: number
           open_to_book?: boolean
+          court_fee_included?: boolean
           specialty?: string | null
           total_raters?: number
           user_id?: string
@@ -2132,6 +2138,7 @@ export type Database = {
           court_number: number | null
           created_at: string
           fnb_order_id: string | null
+          fulfillment_status: string
           id: string
           metode_pembayaran_id: string | null
           notes: string | null
@@ -2144,18 +2151,20 @@ export type Database = {
           court_number?: number | null
           created_at?: string
           fnb_order_id?: string | null
+          fulfillment_status?: string
           id?: string
           metode_pembayaran_id?: string | null
           notes?: string | null
           status?: string
           total_amount_idr: number
           updated_at?: string
-          user_id: string
+          user_id?: string
         }
         Update: {
           court_number?: number | null
           created_at?: string
           fnb_order_id?: string | null
+          fulfillment_status?: string
           id?: string
           metode_pembayaran_id?: string | null
           notes?: string | null
@@ -2265,6 +2274,195 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      rewards: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          how_to_use: string
+          id: string
+          image_storage_path: string | null
+          image_url: string | null
+          is_active: boolean
+          name: string
+          redeemed_count: number
+          reward_type: string
+          star_cost: number
+          stock_limit: number | null
+          terms_and_conditions: string
+          updated_at: string
+          voucher_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          how_to_use?: string
+          id?: string
+          image_storage_path?: string | null
+          image_url?: string | null
+          is_active?: boolean
+          name: string
+          redeemed_count?: number
+          reward_type?: string
+          star_cost: number
+          stock_limit?: number | null
+          terms_and_conditions?: string
+          updated_at?: string
+          voucher_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          how_to_use?: string
+          id?: string
+          image_storage_path?: string | null
+          image_url?: string | null
+          is_active?: boolean
+          name?: string
+          redeemed_count?: number
+          reward_type?: string
+          star_cost?: number
+          stock_limit?: number | null
+          terms_and_conditions?: string
+          updated_at?: string
+          voucher_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rewards_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "rewards_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: true
+            referencedRelation: "vouchers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voucher_codes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          issued_via: string
+          redeemed_by: string | null
+          used_at: string | null
+          user_id: string
+          voucher_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          issued_via?: string
+          redeemed_by?: string | null
+          used_at?: string | null
+          user_id: string
+          voucher_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          issued_via?: string
+          redeemed_by?: string | null
+          used_at?: string | null
+          user_id?: string
+          voucher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voucher_codes_redeemed_by_fkey"
+            columns: ["redeemed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "voucher_codes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "voucher_codes_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "vouchers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vouchers: {
+        Row: {
+          assign_to_all: boolean
+          bg_color: string
+          created_at: string
+          created_by: string | null
+          description: string
+          how_to_get: string
+          how_to_use: string
+          id: string
+          image_storage_path: string | null
+          image_url: string | null
+          name: string
+          terms_and_conditions: string
+          updated_at: string
+          valid_from: string
+          valid_until: string
+        }
+        Insert: {
+          assign_to_all?: boolean
+          bg_color?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          how_to_get?: string
+          how_to_use?: string
+          id?: string
+          image_storage_path?: string | null
+          image_url?: string | null
+          name: string
+          terms_and_conditions?: string
+          updated_at?: string
+          valid_from: string
+          valid_until: string
+        }
+        Update: {
+          assign_to_all?: boolean
+          bg_color?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          how_to_get?: string
+          how_to_use?: string
+          id?: string
+          image_storage_path?: string | null
+          image_url?: string | null
+          name?: string
+          terms_and_conditions?: string
+          updated_at?: string
+          valid_from?: string
+          valid_until?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vouchers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
     }
     Views: {
@@ -2439,6 +2637,15 @@ export type Database = {
         Returns: undefined
       }
       _normalize_gold_promo_code: { Args: { p_code: string }; Returns: string }
+      _normalize_voucher_code: { Args: { p_code: string }; Returns: string }
+      _insert_voucher_code_for_user: {
+        Args: { p_issued_via?: string; p_user_id: string; p_voucher_id: string }
+        Returns: boolean
+      }
+      _issue_voucher_code: {
+        Args: { p_issued_via?: string; p_user_id: string; p_voucher_id: string }
+        Returns: string
+      }
       _open_match_approved_players: {
         Args: { p_match_id: string }
         Returns: string[]
@@ -2569,6 +2776,15 @@ export type Database = {
       admin_publish_tournament: {
         Args: { p_actor_user_id: string; p_tournament_id: string }
         Returns: undefined
+      }
+      admin_redeem_voucher_code: {
+        Args: {
+          p_actor_user_id: string
+          p_code: string
+          p_user_id: string
+          p_voucher_id: string
+        }
+        Returns: Json
       }
       admin_review_tournament_team: {
         Args: { p_actor_user_id: string; p_approve: boolean; p_team_id: string }
@@ -2975,6 +3191,7 @@ export type Database = {
         Args: { p_tournament_id: string }
         Returns: undefined
       }
+      generate_voucher_code: { Args: never; Returns: string }
       get_coach_court_grid: {
         Args: { p_booking_date: string; p_instructor_id: string }
         Returns: {
@@ -3182,6 +3399,14 @@ export type Database = {
         Args: { p_team_id: string; p_username: string }
         Returns: undefined
       }
+      issue_voucher_codes: {
+        Args: {
+          p_assign_to_all?: boolean
+          p_user_ids?: string[]
+          p_voucher_id: string
+        }
+        Returns: number
+      }
       is_holiday_date: { Args: { p_date: string }; Returns: boolean }
       is_instructor: { Args: { _user_id: string }; Returns: boolean }
       is_superadmin: { Args: { p_uid?: string }; Returns: boolean }
@@ -3318,6 +3543,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      redeem_reward_with_stars: {
+        Args: { p_reward_id: string; p_user_id: string }
+        Returns: Json
       }
       register_tournament_team: {
         Args: {
@@ -3531,6 +3760,10 @@ export type Database = {
           p_match_id: string
           p_scheduled_at: string
         }
+        Returns: undefined
+      }
+      set_transaksi_fnb_fulfillment: {
+        Args: { p_fulfillment_status: string; p_transaksi_fnb_id: string }
         Returns: undefined
       }
       update_transaksi_fnb_status: {

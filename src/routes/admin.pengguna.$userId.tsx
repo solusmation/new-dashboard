@@ -66,6 +66,9 @@ function PenggunaDetailPage() {
               <p className="text-sm text-muted-foreground">{data?.email ?? "—"}</p>
               <div className="flex flex-wrap gap-2 mt-2">
                 <Badge>Rank: {String(p.rank ?? "—")}</Badge>
+                <Badge variant={p.membership_tier === "gold" ? "default" : "secondary"}>
+                  Membership: {p.membership_tier === "gold" ? "Gold" : "Basic"}
+                </Badge>
                 <Badge variant="secondary">Role: {String(p.role)}</Badge>
                 {data?.isInstructor ? <Badge variant="default">Coach</Badge> : null}
                 <Badge variant="outline">Coins: {Number(p.coins).toLocaleString("id-ID")}</Badge>
@@ -79,6 +82,7 @@ function PenggunaDetailPage() {
           <UserAdminControls
             userId={userId}
             currentRole={String(p.role ?? "user")}
+            currentMembership={String(p.membership_tier ?? "basic")}
             isInstructor={Boolean(data?.isInstructor)}
           />
 

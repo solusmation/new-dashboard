@@ -4,8 +4,10 @@ import * as React from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  MEMBERSHIP_TIERS,
   promoteUserToInstructor,
   revokeInstructorEligibility,
+  updateProfileMembership,
   updateProfileRole,
 } from "@/lib/admin-users.functions";
 import { Button } from "@/components/ui/button";
@@ -25,19 +27,31 @@ const ROLES = ["user", "admin", "superadmin"] as const;
 type Props = {
   userId: string;
   currentRole: string;
+  currentMembership: string;
   isInstructor: boolean;
 };
 
-export function UserAdminControls({ userId, currentRole, isInstructor }: Props) {
+export function UserAdminControls({
+  userId,
+  currentRole,
+  currentMembership,
+  isInstructor,
+}: Props) {
   const queryClient = useQueryClient();
   const [role, setRole] = React.useState(currentRole);
+  const [membership, setMembership] = React.useState(currentMembership);
   const [hourlyRate, setHourlyRate] = React.useState("150000");
 
   React.useEffect(() => {
     setRole(currentRole);
   }, [currentRole]);
 
+  React.useEffect(() => {
+    setMembership(currentMembership === "gold" ? "gold" : "basic");
+  }, [currentMembership]);
+
   const updateRoleFn = useServerFn(updateProfileRole);
+  const updateMembershipFn = useServerFn(updateProfileMembership);
   const promoteFn = useServerFn(promoteUserToInstructor);
   const revokeFn = useServerFn(revokeInstructorEligibility);
 
@@ -50,6 +64,23 @@ export function UserAdminControls({ userId, currentRole, isInstructor }: Props) 
       toast.success("Role pengguna diperbarui.");
       void queryClient.invalidateQueries({ queryKey: ["admin", "user", userId] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const membershipMutation = useMutation({
+    mutationFn: () =>
+      updateMembershipFn({
+        data: {
+          userId,
+          membershipTier: membership === "gold" ? "gold" : "basic",
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Membership pengguna diperbarui.");
+      void queryClient.invalidateQueries({ queryKey: ["admin", "user", userId] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "gold-benefits", userId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -87,15 +118,45 @@ export function UserAdminControls({ userId, currentRole, isInstructor }: Props) 
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const busy = roleMutation.isPending || promoteMutation.isPending || revokeMutation.isPending;
+  const busy =
+    roleMutation.isPending ||
+    membershipMutation.isPending ||
+    promoteMutation.isPending ||
+    revokeMutation.isPending;
+  const savedMembership = currentMembership === "gold" ? "gold" : "basic";
 
   return (
     <section className="rounded-xl border border-primary/20 bg-card p-5 shadow-sm space-y-5">
       <div>
         <h2 className="font-semibold text-foreground">Kelola pengguna (Superadmin)</h2>
         <p className="text-xs text-muted-foreground mt-1">
-          Ubah role atau jadikan / cabut eligibility coach.
+          Ubah membership, role, atau jadikan / cabut eligibility coach.
         </p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+        <div className="flex-1 space-y-2">
+          <Label htmlFor="user-membership">Membership</Label>
+          <Select value={membership} onValueChange={setMembership} disabled={busy}>
+            <SelectTrigger id="user-membership" className="w-full sm:max-w-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MEMBERSHIP_TIERS.map((tier) => (
+                <SelectItem key={tier} value={tier}>
+                  {tier === "gold" ? "Gold" : "Basic"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button
+          type="button"
+          disabled={busy || membership === savedMembership}
+          onClick={() => membershipMutation.mutate()}
+        >
+          Simpan membership
+        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-end gap-3">

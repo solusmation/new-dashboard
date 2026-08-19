@@ -4,8 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GraduationCap, LayoutGrid, Trash2 } from "lucide-react";
 import { getInstructorsDashboard } from "@/lib/admin-data.functions";
 import { deleteCoachById } from "@/lib/admin-coach.functions";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AddCoachDialog } from "@/components/admin/AddCoachDialog";
 import { toast } from "sonner";
 
@@ -78,22 +78,31 @@ function CoachAdminPage() {
               <th className="px-4 py-3">Nama</th>
               <th className="px-4 py-3">Tarif / jam</th>
               <th className="px-4 py-3">Rating</th>
-              <th className="px-4 py-3">Buka booking</th>
               <th className="px-4 py-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r: Record<string, unknown>) => (
               <tr key={String(r.id)} className="border-t">
-                <td className="px-4 py-3 font-medium">{String(r.display_name)}</td>
-                <td className="px-4 py-3 tabular-nums">{fmtIDR(Number(r.hourly_rate_idr))}</td>
-                <td className="px-4 py-3">
-                  {Number(r.avg_rating).toFixed(1)} ({String(r.total_raters)})
+                <td className="px-4 py-3 font-medium">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src={typeof r.avatar_url === "string" ? r.avatar_url : undefined} />
+                      <AvatarFallback>
+                        {String(r.display_name ?? "C").slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span>{String(r.display_name)}</span>
+                  </div>
                 </td>
                 <td className="px-4 py-3">
-                  <Badge variant={r.open_to_book ? "default" : "secondary"}>
-                    {r.open_to_book ? "Ya" : "Tidak"}
-                  </Badge>
+                  <div className="tabular-nums">{fmtIDR(Number(r.hourly_rate_idr))}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {r.court_fee_included ? "Termasuk Court" : "Tidak Termasuk Court"}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  {Number(r.avg_rating).toFixed(1)} ({String(r.total_raters)})
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap justify-end gap-2">
@@ -120,7 +129,7 @@ function CoachAdminPage() {
             ))}
             {!isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                   Belum ada coach.
                 </td>
               </tr>

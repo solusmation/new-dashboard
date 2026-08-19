@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Clock, LayoutGrid, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Save } from "lucide-react";
 import {
   getCoachById,
   getCoachScheduleEdit,
@@ -102,19 +102,6 @@ function CoachJadwalPage() {
           </Link>
         </Button>
         <h1 className="text-xl font-semibold">Edit jadwal</h1>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Button asChild variant="secondary" className="h-12 justify-start">
-          <Link to="/admin/coach/$coachId/hub" params={{ coachId }}>
-            <LayoutGrid className="h-4 w-4 mr-2" />
-            Coach Hub
-          </Link>
-        </Button>
-        <Button variant="outline" className="h-12 justify-start" disabled>
-          <Clock className="h-4 w-4 mr-2" />
-          Edit jadwal
-        </Button>
       </div>
 
       {isLoading ? (

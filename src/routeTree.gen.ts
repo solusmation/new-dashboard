@@ -13,7 +13,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminVoucherRouteImport } from './routes/admin.voucher'
 import { Route as AdminTournamentRouteImport } from './routes/admin.tournament'
+import { Route as AdminRewardRouteImport } from './routes/admin.reward'
 import { Route as AdminReservasiRouteImport } from './routes/admin.reservasi'
 import { Route as AdminProgramRouteImport } from './routes/admin.program'
 import { Route as AdminPenggunaRouteImport } from './routes/admin.pengguna'
@@ -25,13 +27,17 @@ import { Route as AdminInstrukturRouteImport } from './routes/admin.instruktur'
 import { Route as AdminFnbRouteImport } from './routes/admin.fnb'
 import { Route as AdminCoachRouteImport } from './routes/admin.coach'
 import { Route as AdminAiAssistantRouteImport } from './routes/admin.ai-assistant'
+import { Route as AdminVoucherIndexRouteImport } from './routes/admin.voucher.index'
 import { Route as AdminTournamentIndexRouteImport } from './routes/admin.tournament.index'
+import { Route as AdminRewardIndexRouteImport } from './routes/admin.reward.index'
 import { Route as AdminReservasiIndexRouteImport } from './routes/admin.reservasi.index'
 import { Route as AdminKeuanganIndexRouteImport } from './routes/admin.keuangan.index'
 import { Route as AdminFnbIndexRouteImport } from './routes/admin.fnb.index'
 import { Route as AdminCoachIndexRouteImport } from './routes/admin.coach.index'
+import { Route as AdminVoucherVoucherIdRouteImport } from './routes/admin.voucher.$voucherId'
 import { Route as AdminTournamentNewRouteImport } from './routes/admin.tournament.new'
 import { Route as AdminTournamentTournamentIdRouteImport } from './routes/admin.tournament.$tournamentId'
+import { Route as AdminRewardRewardIdRouteImport } from './routes/admin.reward.$rewardId'
 import { Route as AdminReservasiDetailRouteImport } from './routes/admin.reservasi.detail'
 import { Route as AdminPenggunaUserIdRouteImport } from './routes/admin.pengguna.$userId'
 import { Route as AdminKeuanganTransaksiRouteImport } from './routes/admin.keuangan.transaksi'
@@ -64,9 +70,19 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminVoucherRoute = AdminVoucherRouteImport.update({
+  id: '/voucher',
+  path: '/voucher',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminTournamentRoute = AdminTournamentRouteImport.update({
   id: '/tournament',
   path: '/tournament',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRewardRoute = AdminRewardRouteImport.update({
+  id: '/reward',
+  path: '/reward',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminReservasiRoute = AdminReservasiRouteImport.update({
@@ -124,10 +140,20 @@ const AdminAiAssistantRoute = AdminAiAssistantRouteImport.update({
   path: '/ai-assistant',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminVoucherIndexRoute = AdminVoucherIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminVoucherRoute,
+} as any)
 const AdminTournamentIndexRoute = AdminTournamentIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminTournamentRoute,
+} as any)
+const AdminRewardIndexRoute = AdminRewardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRewardRoute,
 } as any)
 const AdminReservasiIndexRoute = AdminReservasiIndexRouteImport.update({
   id: '/',
@@ -149,6 +175,11 @@ const AdminCoachIndexRoute = AdminCoachIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminCoachRoute,
 } as any)
+const AdminVoucherVoucherIdRoute = AdminVoucherVoucherIdRouteImport.update({
+  id: '/$voucherId',
+  path: '/$voucherId',
+  getParentRoute: () => AdminVoucherRoute,
+} as any)
 const AdminTournamentNewRoute = AdminTournamentNewRouteImport.update({
   id: '/new',
   path: '/new',
@@ -160,6 +191,11 @@ const AdminTournamentTournamentIdRoute =
     path: '/$tournamentId',
     getParentRoute: () => AdminTournamentRoute,
   } as any)
+const AdminRewardRewardIdRoute = AdminRewardRewardIdRouteImport.update({
+  id: '/$rewardId',
+  path: '/$rewardId',
+  getParentRoute: () => AdminRewardRoute,
+} as any)
 const AdminReservasiDetailRoute = AdminReservasiDetailRouteImport.update({
   id: '/detail',
   path: '/detail',
@@ -233,7 +269,9 @@ export interface FileRoutesByFullPath {
   '/admin/pengguna': typeof AdminPenggunaRouteWithChildren
   '/admin/program': typeof AdminProgramRoute
   '/admin/reservasi': typeof AdminReservasiRouteWithChildren
+  '/admin/reward': typeof AdminRewardRouteWithChildren
   '/admin/tournament': typeof AdminTournamentRouteWithChildren
+  '/admin/voucher': typeof AdminVoucherRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/admin/fnb/transaksi': typeof AdminFnbTransaksiRoute
   '/admin/keuangan/okupansi': typeof AdminKeuanganOkupansiRoute
@@ -242,13 +280,17 @@ export interface FileRoutesByFullPath {
   '/admin/keuangan/transaksi': typeof AdminKeuanganTransaksiRoute
   '/admin/pengguna/$userId': typeof AdminPenggunaUserIdRoute
   '/admin/reservasi/detail': typeof AdminReservasiDetailRoute
+  '/admin/reward/$rewardId': typeof AdminRewardRewardIdRoute
   '/admin/tournament/$tournamentId': typeof AdminTournamentTournamentIdRouteWithChildren
   '/admin/tournament/new': typeof AdminTournamentNewRoute
+  '/admin/voucher/$voucherId': typeof AdminVoucherVoucherIdRoute
   '/admin/coach/': typeof AdminCoachIndexRoute
   '/admin/fnb/': typeof AdminFnbIndexRoute
   '/admin/keuangan/': typeof AdminKeuanganIndexRoute
   '/admin/reservasi/': typeof AdminReservasiIndexRoute
+  '/admin/reward/': typeof AdminRewardIndexRoute
   '/admin/tournament/': typeof AdminTournamentIndexRoute
+  '/admin/voucher/': typeof AdminVoucherIndexRoute
   '/admin/coach/$coachId/hub': typeof AdminCoachCoachIdHubRoute
   '/admin/coach/$coachId/jadwal': typeof AdminCoachCoachIdJadwalRoute
   '/admin/tournament/$tournamentId/edit': typeof AdminTournamentTournamentIdEditRoute
@@ -272,12 +314,16 @@ export interface FileRoutesByTo {
   '/admin/keuangan/transaksi': typeof AdminKeuanganTransaksiRoute
   '/admin/pengguna/$userId': typeof AdminPenggunaUserIdRoute
   '/admin/reservasi/detail': typeof AdminReservasiDetailRoute
+  '/admin/reward/$rewardId': typeof AdminRewardRewardIdRoute
   '/admin/tournament/new': typeof AdminTournamentNewRoute
+  '/admin/voucher/$voucherId': typeof AdminVoucherVoucherIdRoute
   '/admin/coach': typeof AdminCoachIndexRoute
   '/admin/fnb': typeof AdminFnbIndexRoute
   '/admin/keuangan': typeof AdminKeuanganIndexRoute
   '/admin/reservasi': typeof AdminReservasiIndexRoute
+  '/admin/reward': typeof AdminRewardIndexRoute
   '/admin/tournament': typeof AdminTournamentIndexRoute
+  '/admin/voucher': typeof AdminVoucherIndexRoute
   '/admin/coach/$coachId/hub': typeof AdminCoachCoachIdHubRoute
   '/admin/coach/$coachId/jadwal': typeof AdminCoachCoachIdJadwalRoute
   '/admin/tournament/$tournamentId/edit': typeof AdminTournamentTournamentIdEditRoute
@@ -299,7 +345,9 @@ export interface FileRoutesById {
   '/admin/pengguna': typeof AdminPenggunaRouteWithChildren
   '/admin/program': typeof AdminProgramRoute
   '/admin/reservasi': typeof AdminReservasiRouteWithChildren
+  '/admin/reward': typeof AdminRewardRouteWithChildren
   '/admin/tournament': typeof AdminTournamentRouteWithChildren
+  '/admin/voucher': typeof AdminVoucherRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/admin/fnb/transaksi': typeof AdminFnbTransaksiRoute
   '/admin/keuangan/okupansi': typeof AdminKeuanganOkupansiRoute
@@ -308,13 +356,17 @@ export interface FileRoutesById {
   '/admin/keuangan/transaksi': typeof AdminKeuanganTransaksiRoute
   '/admin/pengguna/$userId': typeof AdminPenggunaUserIdRoute
   '/admin/reservasi/detail': typeof AdminReservasiDetailRoute
+  '/admin/reward/$rewardId': typeof AdminRewardRewardIdRoute
   '/admin/tournament/$tournamentId': typeof AdminTournamentTournamentIdRouteWithChildren
   '/admin/tournament/new': typeof AdminTournamentNewRoute
+  '/admin/voucher/$voucherId': typeof AdminVoucherVoucherIdRoute
   '/admin/coach/': typeof AdminCoachIndexRoute
   '/admin/fnb/': typeof AdminFnbIndexRoute
   '/admin/keuangan/': typeof AdminKeuanganIndexRoute
   '/admin/reservasi/': typeof AdminReservasiIndexRoute
+  '/admin/reward/': typeof AdminRewardIndexRoute
   '/admin/tournament/': typeof AdminTournamentIndexRoute
+  '/admin/voucher/': typeof AdminVoucherIndexRoute
   '/admin/coach/$coachId/hub': typeof AdminCoachCoachIdHubRoute
   '/admin/coach/$coachId/jadwal': typeof AdminCoachCoachIdJadwalRoute
   '/admin/tournament/$tournamentId/edit': typeof AdminTournamentTournamentIdEditRoute
@@ -337,7 +389,9 @@ export interface FileRouteTypes {
     | '/admin/pengguna'
     | '/admin/program'
     | '/admin/reservasi'
+    | '/admin/reward'
     | '/admin/tournament'
+    | '/admin/voucher'
     | '/admin/'
     | '/admin/fnb/transaksi'
     | '/admin/keuangan/okupansi'
@@ -346,13 +400,17 @@ export interface FileRouteTypes {
     | '/admin/keuangan/transaksi'
     | '/admin/pengguna/$userId'
     | '/admin/reservasi/detail'
+    | '/admin/reward/$rewardId'
     | '/admin/tournament/$tournamentId'
     | '/admin/tournament/new'
+    | '/admin/voucher/$voucherId'
     | '/admin/coach/'
     | '/admin/fnb/'
     | '/admin/keuangan/'
     | '/admin/reservasi/'
+    | '/admin/reward/'
     | '/admin/tournament/'
+    | '/admin/voucher/'
     | '/admin/coach/$coachId/hub'
     | '/admin/coach/$coachId/jadwal'
     | '/admin/tournament/$tournamentId/edit'
@@ -376,12 +434,16 @@ export interface FileRouteTypes {
     | '/admin/keuangan/transaksi'
     | '/admin/pengguna/$userId'
     | '/admin/reservasi/detail'
+    | '/admin/reward/$rewardId'
     | '/admin/tournament/new'
+    | '/admin/voucher/$voucherId'
     | '/admin/coach'
     | '/admin/fnb'
     | '/admin/keuangan'
     | '/admin/reservasi'
+    | '/admin/reward'
     | '/admin/tournament'
+    | '/admin/voucher'
     | '/admin/coach/$coachId/hub'
     | '/admin/coach/$coachId/jadwal'
     | '/admin/tournament/$tournamentId/edit'
@@ -402,7 +464,9 @@ export interface FileRouteTypes {
     | '/admin/pengguna'
     | '/admin/program'
     | '/admin/reservasi'
+    | '/admin/reward'
     | '/admin/tournament'
+    | '/admin/voucher'
     | '/admin/'
     | '/admin/fnb/transaksi'
     | '/admin/keuangan/okupansi'
@@ -411,13 +475,17 @@ export interface FileRouteTypes {
     | '/admin/keuangan/transaksi'
     | '/admin/pengguna/$userId'
     | '/admin/reservasi/detail'
+    | '/admin/reward/$rewardId'
     | '/admin/tournament/$tournamentId'
     | '/admin/tournament/new'
+    | '/admin/voucher/$voucherId'
     | '/admin/coach/'
     | '/admin/fnb/'
     | '/admin/keuangan/'
     | '/admin/reservasi/'
+    | '/admin/reward/'
     | '/admin/tournament/'
+    | '/admin/voucher/'
     | '/admin/coach/$coachId/hub'
     | '/admin/coach/$coachId/jadwal'
     | '/admin/tournament/$tournamentId/edit'
@@ -460,11 +528,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/voucher': {
+      id: '/admin/voucher'
+      path: '/voucher'
+      fullPath: '/admin/voucher'
+      preLoaderRoute: typeof AdminVoucherRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/tournament': {
       id: '/admin/tournament'
       path: '/tournament'
       fullPath: '/admin/tournament'
       preLoaderRoute: typeof AdminTournamentRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reward': {
+      id: '/admin/reward'
+      path: '/reward'
+      fullPath: '/admin/reward'
+      preLoaderRoute: typeof AdminRewardRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/reservasi': {
@@ -544,12 +626,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAiAssistantRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/voucher/': {
+      id: '/admin/voucher/'
+      path: '/'
+      fullPath: '/admin/voucher/'
+      preLoaderRoute: typeof AdminVoucherIndexRouteImport
+      parentRoute: typeof AdminVoucherRoute
+    }
     '/admin/tournament/': {
       id: '/admin/tournament/'
       path: '/'
       fullPath: '/admin/tournament/'
       preLoaderRoute: typeof AdminTournamentIndexRouteImport
       parentRoute: typeof AdminTournamentRoute
+    }
+    '/admin/reward/': {
+      id: '/admin/reward/'
+      path: '/'
+      fullPath: '/admin/reward/'
+      preLoaderRoute: typeof AdminRewardIndexRouteImport
+      parentRoute: typeof AdminRewardRoute
     }
     '/admin/reservasi/': {
       id: '/admin/reservasi/'
@@ -579,6 +675,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCoachIndexRouteImport
       parentRoute: typeof AdminCoachRoute
     }
+    '/admin/voucher/$voucherId': {
+      id: '/admin/voucher/$voucherId'
+      path: '/$voucherId'
+      fullPath: '/admin/voucher/$voucherId'
+      preLoaderRoute: typeof AdminVoucherVoucherIdRouteImport
+      parentRoute: typeof AdminVoucherRoute
+    }
     '/admin/tournament/new': {
       id: '/admin/tournament/new'
       path: '/new'
@@ -592,6 +695,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/tournament/$tournamentId'
       preLoaderRoute: typeof AdminTournamentTournamentIdRouteImport
       parentRoute: typeof AdminTournamentRoute
+    }
+    '/admin/reward/$rewardId': {
+      id: '/admin/reward/$rewardId'
+      path: '/$rewardId'
+      fullPath: '/admin/reward/$rewardId'
+      preLoaderRoute: typeof AdminRewardRewardIdRouteImport
+      parentRoute: typeof AdminRewardRoute
     }
     '/admin/reservasi/detail': {
       id: '/admin/reservasi/detail'
@@ -749,6 +859,20 @@ const AdminReservasiRouteWithChildren = AdminReservasiRoute._addFileChildren(
   AdminReservasiRouteChildren,
 )
 
+interface AdminRewardRouteChildren {
+  AdminRewardRewardIdRoute: typeof AdminRewardRewardIdRoute
+  AdminRewardIndexRoute: typeof AdminRewardIndexRoute
+}
+
+const AdminRewardRouteChildren: AdminRewardRouteChildren = {
+  AdminRewardRewardIdRoute: AdminRewardRewardIdRoute,
+  AdminRewardIndexRoute: AdminRewardIndexRoute,
+}
+
+const AdminRewardRouteWithChildren = AdminRewardRoute._addFileChildren(
+  AdminRewardRouteChildren,
+)
+
 interface AdminTournamentTournamentIdRouteChildren {
   AdminTournamentTournamentIdEditRoute: typeof AdminTournamentTournamentIdEditRoute
   AdminTournamentTournamentIdIndexRoute: typeof AdminTournamentTournamentIdIndexRoute
@@ -783,6 +907,20 @@ const AdminTournamentRouteWithChildren = AdminTournamentRoute._addFileChildren(
   AdminTournamentRouteChildren,
 )
 
+interface AdminVoucherRouteChildren {
+  AdminVoucherVoucherIdRoute: typeof AdminVoucherVoucherIdRoute
+  AdminVoucherIndexRoute: typeof AdminVoucherIndexRoute
+}
+
+const AdminVoucherRouteChildren: AdminVoucherRouteChildren = {
+  AdminVoucherVoucherIdRoute: AdminVoucherVoucherIdRoute,
+  AdminVoucherIndexRoute: AdminVoucherIndexRoute,
+}
+
+const AdminVoucherRouteWithChildren = AdminVoucherRoute._addFileChildren(
+  AdminVoucherRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminAiAssistantRoute: typeof AdminAiAssistantRoute
   AdminCoachRoute: typeof AdminCoachRouteWithChildren
@@ -795,7 +933,9 @@ interface AdminRouteChildren {
   AdminPenggunaRoute: typeof AdminPenggunaRouteWithChildren
   AdminProgramRoute: typeof AdminProgramRoute
   AdminReservasiRoute: typeof AdminReservasiRouteWithChildren
+  AdminRewardRoute: typeof AdminRewardRouteWithChildren
   AdminTournamentRoute: typeof AdminTournamentRouteWithChildren
+  AdminVoucherRoute: typeof AdminVoucherRouteWithChildren
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -811,7 +951,9 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminPenggunaRoute: AdminPenggunaRouteWithChildren,
   AdminProgramRoute: AdminProgramRoute,
   AdminReservasiRoute: AdminReservasiRouteWithChildren,
+  AdminRewardRoute: AdminRewardRouteWithChildren,
   AdminTournamentRoute: AdminTournamentRouteWithChildren,
+  AdminVoucherRoute: AdminVoucherRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
 }
 

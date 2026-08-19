@@ -295,7 +295,7 @@ export const getInstructorsDashboard = createServerFn({ method: "GET" })
     const { data: rows, error } = await supabaseAdmin
       .from("coaches")
       .select(
-        "id, user_id, display_name, hourly_rate_idr, avg_rating, total_raters, open_to_book, bio, created_at",
+        "id, user_id, display_name, avatar_url, hourly_rate_idr, court_fee_included, avg_rating, total_raters, open_to_book, bio, created_at",
       )
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);

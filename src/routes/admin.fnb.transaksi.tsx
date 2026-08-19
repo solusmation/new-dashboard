@@ -1,9 +1,15 @@
 import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SlidersHorizontal } from "lucide-react";
-import { FNB_CATEGORY_LABELS, listTransaksiFnb } from "@/lib/admin-fnb.functions";
+import {
+  FNB_CATEGORY_LABELS,
+  listTransaksiFnb,
+  updateTransaksiFnbFulfillment,
+  type FnbFulfillmentStatus,
+} from "@/lib/admin-fnb.functions";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/fnb/transaksi")({
   component: FnbTransaksiPage,
@@ -74,6 +82,7 @@ type TxRow = {
   notes: string | null;
   court_number: number | null;
   fnb_order_id: string | null;
+  fulfillment_status: FnbFulfillmentStatus;
   created_at: string;
   profiles: { display_name: string | null; username: string | null } | null;
   items: Array<{
@@ -85,8 +94,16 @@ type TxRow = {
   }>;
 };
 
+function fulfillmentOf(tx: TxRow): FnbFulfillmentStatus {
+  if (tx.fulfillment_status === "cancelled") return "cancelled";
+  if (tx.fulfillment_status === "confirmed") return "confirmed";
+  return "pending";
+}
+
 function FnbTransaksiPage() {
+  const queryClient = useQueryClient();
   const fetchTx = useServerFn(listTransaksiFnb);
+  const updateFulfillment = useServerFn(updateTransaksiFnbFulfillment);
   const today = todayYmdJakarta();
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [mode, setMode] = React.useState<DateFilterMode>("day");
@@ -123,7 +140,7 @@ function FnbTransaksiPage() {
     return `${fmtYmdLabel(range.from)} – ${fmtYmdLabel(range.to)}`;
   }, [mode, selectedDate, selectedMonth, range.from, range.to, today]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["admin", "fnb", "transaksi", mode, range.from, range.to],
     queryFn: () =>
       fetchTx({
@@ -134,6 +151,20 @@ function FnbTransaksiPage() {
         },
       }),
     enabled: Boolean(range.from && range.to),
+  });
+
+  const fulfillmentMutation = useMutation({
+    mutationFn: (input: { transaksiFnbId: string; fulfillmentStatus: FnbFulfillmentStatus }) =>
+      updateFulfillment({ data: input }),
+    onSuccess: (_res, vars) => {
+      toast.success(
+        vars.fulfillmentStatus === "cancelled"
+          ? "Pesanan ditandai Cancel."
+          : "Pesanan ditandai Confirm.",
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin", "fnb", "transaksi"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const rows = (data?.transactions ?? []) as TxRow[];
@@ -276,9 +307,25 @@ function FnbTransaksiPage() {
             profile?.display_name ||
             (profile?.username ? `@${profile.username}` : null) ||
             tx.user_id.slice(0, 8);
+          const fulfillment = fulfillmentOf(tx);
+          const cancelled = fulfillment === "cancelled";
+          const confirmed = fulfillment === "confirmed";
+          const pending = fulfillment === "pending";
+          const pendingId = fulfillmentMutation.variables?.transaksiFnbId;
+          const busy = fulfillmentMutation.isPending && pendingId === tx.id;
 
           return (
-            <div key={tx.id} className="rounded-xl border bg-card shadow-sm p-4 space-y-3">
+            <div
+              key={tx.id}
+              className={cn(
+                "rounded-xl border shadow-sm p-4 space-y-3",
+                cancelled
+                  ? "border-red-200 bg-red-100 dark:border-red-900/60 dark:bg-red-950/40"
+                  : confirmed
+                    ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30"
+                    : "border bg-card",
+              )}
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="font-medium">{buyer}</div>
@@ -292,10 +339,34 @@ function FnbTransaksiPage() {
                     <div className="text-xs text-muted-foreground mt-1">{tx.notes}</div>
                   ) : null}
                 </div>
-                <span className="font-semibold tabular-nums">{fmtIDR(tx.total_amount_idr)}</span>
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className="font-semibold tabular-nums">{fmtIDR(tx.total_amount_idr)}</span>
+                  <Badge
+                    variant={cancelled ? "destructive" : pending ? "secondary" : "outline"}
+                    className={cn(
+                      "font-semibold",
+                      confirmed
+                        ? "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-100"
+                        : pending
+                          ? ""
+                          : "",
+                    )}
+                  >
+                    {cancelled ? "Cancel" : confirmed ? "Confirm" : "Menunggu"}
+                  </Badge>
+                </div>
               </div>
 
-              <div className="rounded-lg bg-muted/40 text-sm divide-y">
+              <div
+                className={cn(
+                  "rounded-lg text-sm divide-y",
+                  cancelled
+                    ? "bg-red-50/80 dark:bg-red-950/50"
+                    : confirmed
+                      ? "bg-white/70 dark:bg-background/40"
+                      : "bg-muted/40",
+                )}
+              >
                 {tx.items.map((it, i) => (
                   <div key={i} className="flex flex-wrap justify-between gap-2 px-3 py-2">
                     <span>
@@ -312,11 +383,55 @@ function FnbTransaksiPage() {
                   </div>
                 ))}
               </div>
+
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={confirmed ? "default" : "outline"}
+                  disabled={busy || confirmed}
+                  onClick={() =>
+                    fulfillmentMutation.mutate({
+                      transaksiFnbId: tx.id,
+                      fulfillmentStatus: "confirmed",
+                    })
+                  }
+                >
+                  Confirm
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={cancelled ? "destructive" : "outline"}
+                  className={cancelled ? "" : "border-red-300 text-red-700 hover:bg-red-50"}
+                  disabled={busy || cancelled}
+                  onClick={() =>
+                    fulfillmentMutation.mutate({
+                      transaksiFnbId: tx.id,
+                      fulfillmentStatus: "cancelled",
+                    })
+                  }
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           );
         })}
 
-        {!isLoading && rows.length === 0 && (
+        {isError ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-8 text-center text-sm text-destructive">
+            {error instanceof Error ? error.message : "Gagal memuat transaksi FnB."}
+          </div>
+        ) : null}
+
+        {isLoading ? (
+          <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
+            Memuat transaksi…
+          </div>
+        ) : null}
+
+        {!isLoading && !isError && rows.length === 0 && (
           <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
             {emptyMessage}
           </div>

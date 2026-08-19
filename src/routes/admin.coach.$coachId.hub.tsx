@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
 import { id } from "date-fns/locale";
-import { ArrowLeft, CalendarIcon, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarIcon, Loader2, Trash2 } from "lucide-react";
 import {
   deleteCoachBooking,
   getCoachBookingDetail,
@@ -14,6 +14,7 @@ import {
   type CoachHubGridCell,
 } from "@/lib/admin-coach.functions";
 import { CoachHubGrid, CoachHubLegend } from "@/components/admin/CoachHubGrid";
+import { EditCoachProfileDialog } from "@/components/admin/EditCoachProfileDialog";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -54,6 +55,7 @@ function CoachHubPage() {
   const [selectedDate, setSelectedDate] = useState(todayYmd);
   const [calOpen, setCalOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
 
   const fetchCoach = useServerFn(getCoachById);
@@ -155,15 +157,17 @@ function CoachHubPage() {
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Button asChild variant="outline" className="h-12 justify-start">
-          <Link to="/admin/coach/$coachId/hub" params={{ coachId }}>
-            Coach Hub
-          </Link>
+      <div className="flex gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-12 flex-1 justify-start bg-white"
+          onClick={() => setProfileOpen(true)}
+        >
+          Edit Profile
         </Button>
-        <Button asChild variant="secondary" className="h-12 justify-start">
+        <Button asChild variant="outline" className="h-12 flex-1 justify-start bg-white">
           <Link to="/admin/coach/$coachId/jadwal" params={{ coachId }}>
-            <Pencil className="h-4 w-4 mr-2" />
             Edit jadwal
           </Link>
         </Button>
@@ -224,6 +228,13 @@ function CoachHubPage() {
       ) : (
         <CoachHubGrid cells={cells} onCellClick={handleCellClick} />
       )}
+
+      <EditCoachProfileDialog
+        coachId={coachId}
+        coach={coachData?.coach}
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+      />
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="sm:max-w-md">

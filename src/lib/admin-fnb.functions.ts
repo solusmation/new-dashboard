@@ -194,7 +194,7 @@ export const listTransaksiFnb = createServerFn({ method: "GET" })
     let query = supabaseAdmin
       .from("transaksi_fnb")
       .select(
-        "id, user_id, total_amount_idr, notes, court_number, fnb_order_id, created_at, profiles!transaksi_fnb_user_id_fkey(display_name, username)",
+        "id, user_id, total_amount_idr, notes, court_number, fnb_order_id, fulfillment_status, created_at, profiles!transaksi_fnb_user_id_fkey(display_name, username)",
       )
       .eq("status", "paid")
       .order("created_at", { ascending: false })
@@ -236,10 +236,78 @@ export const listTransaksiFnb = createServerFn({ method: "GET" })
     }));
 
     return {
-      transactions,
+      transactions: transactions.map((tx) => ({
+        ...tx,
+        fulfillment_status:
+          tx.fulfillment_status === "cancelled"
+            ? "cancelled"
+            : tx.fulfillment_status === "confirmed"
+              ? "confirmed"
+              : "pending",
+      })),
       summary: {
         totalAll: totalAll ?? 0,
         totalToday: totalToday ?? 0,
       },
     };
+  });
+
+export const FNB_FULFILLMENT_STATUSES = ["pending", "confirmed", "cancelled"] as const;
+export type FnbFulfillmentStatus = (typeof FNB_FULFILLMENT_STATUSES)[number];
+
+const FNB_ADMIN_FULFILLMENT_STATUSES = ["confirmed", "cancelled"] as const;
+
+export const updateTransaksiFnbFulfillment = createServerFn({ method: "POST" })
+  .middleware([requireSuperadminAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        transaksiFnbId: z.string().uuid(),
+        fulfillmentStatus: z.enum(FNB_ADMIN_FULFILLMENT_STATUSES),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const { data: tx, error: fetchErr } = await supabaseAdmin
+      .from("transaksi_fnb")
+      .select("id, user_id, fnb_order_id, court_number, fulfillment_status")
+      .eq("id", data.transaksiFnbId)
+      .maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!tx) throw new Error("Transaksi tidak ditemukan.");
+
+    const current: FnbFulfillmentStatus =
+      tx.fulfillment_status === "cancelled"
+        ? "cancelled"
+        : tx.fulfillment_status === "confirmed"
+          ? "confirmed"
+          : "pending";
+    if (current === data.fulfillmentStatus) {
+      return { ok: true as const, fulfillmentStatus: data.fulfillmentStatus };
+    }
+
+    const { error: updateErr } = await supabaseAdmin.rpc("set_transaksi_fnb_fulfillment", {
+      p_transaksi_fnb_id: data.transaksiFnbId,
+      p_fulfillment_status: data.fulfillmentStatus,
+    });
+    if (updateErr) throw new Error(updateErr.message);
+
+    const courtLabel = tx.court_number ? `Lapangan ${tx.court_number}` : "lapangan";
+    const cancelled = data.fulfillmentStatus === "cancelled";
+    const { error: notifyErr } = await supabaseAdmin.rpc("notify_user", {
+      p_user_id: tx.user_id,
+      p_type: cancelled ? "fnb_order_cancelled" : "fnb_order_confirmed",
+      p_title: cancelled ? "Pesanan FnB dibatalkan" : "Pesanan FnB dikonfirmasi",
+      p_body: cancelled
+        ? `Pesanan Anda ke ${courtLabel} berstatus Cancel.`
+        : `Pesanan Anda ke ${courtLabel} berstatus Confirm.`,
+      p_data: {
+        fnb_order_id: tx.fnb_order_id,
+        transaksi_fnb_id: tx.id,
+        fulfillment_status: data.fulfillmentStatus,
+      },
+    });
+    if (notifyErr) throw new Error(notifyErr.message);
+
+    return { ok: true as const, fulfillmentStatus: data.fulfillmentStatus };
   });

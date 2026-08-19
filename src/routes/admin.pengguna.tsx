@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { Users, UserCheck, UserPlus, Activity, Search } from "lucide-react";
 import { KpiCard } from "@/components/admin/KpiCard";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { toast } from "sonner";
 
 import {
   Select,
@@ -21,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getUsersOverview } from "@/lib/admin-users.functions";
+import { getUsersOverview, MEMBERSHIP_TIERS, updateProfileMembership } from "@/lib/admin-users.functions";
 import { APP_RANK_VALUES, appRankLabel } from "@/lib/app-rank";
 import { GoldMemberPromoPanel } from "@/components/admin/GoldMemberPromoPanel";
 
@@ -142,7 +145,7 @@ function PenggunaPage() {
                   </td>
                   <td className="px-5 py-3">
                     <Badge variant={u.membership_tier === "gold" ? "default" : "secondary"}>
-                      {u.membership_tier ?? "basic"}
+                      {u.membership_tier === "gold" ? "Gold" : "Basic"}
                     </Badge>
                   </td>
                   <td className="px-5 py-3">
@@ -172,7 +175,12 @@ function PenggunaPage() {
                 <DialogTitle>Detail Pengguna</DialogTitle>
               </DialogHeader>
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-                <UserDetailCard user={selectedUser} />
+                <UserDetailCard
+                  user={selectedUser}
+                  onMembershipSaved={(tier) =>
+                    setSelectedUser((prev) => (prev ? { ...prev, membership_tier: tier } : prev))
+                  }
+                />
               </div>
             </>
           )}
@@ -184,7 +192,37 @@ function PenggunaPage() {
 
 type UserRow = NonNullable<Awaited<ReturnType<typeof getUsersOverview>>["users"]>[number];
 
-function UserDetailCard({ user: u }: { user: UserRow }) {
+function UserDetailCard({
+  user: u,
+  onMembershipSaved,
+}: {
+  user: UserRow;
+  onMembershipSaved: (tier: (typeof MEMBERSHIP_TIERS)[number]) => void;
+}) {
+  const queryClient = useQueryClient();
+  const updateMembershipFn = useServerFn(updateProfileMembership);
+  const currentTier = u.membership_tier === "gold" ? "gold" : "basic";
+  const [membership, setMembership] = useState(currentTier);
+
+  useEffect(() => {
+    setMembership(currentTier);
+  }, [u.user_id, currentTier]);
+
+  const membershipMutation = useMutation({
+    mutationFn: () =>
+      updateMembershipFn({
+        data: { userId: u.user_id, membershipTier: membership },
+      }),
+    onSuccess: (res) => {
+      toast.success("Membership pengguna diperbarui.");
+      onMembershipSaved(res.membershipTier);
+      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "user", u.user_id] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "gold-benefits", u.user_id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-4">
@@ -203,10 +241,39 @@ function UserDetailCard({ user: u }: { user: UserRow }) {
         <DetailItem label="Role" value={u.role} />
         <DetailItem label="Rank" value={appRankLabel(u.rank)} />
         <DetailItem label="Total Score" value={String(u.total_score ?? 0)} />
-        <DetailItem label="Membership Tier" value={u.membership_tier ?? "basic"} />
         <DetailItem label="Coins" value={u.coins.toLocaleString("id-ID")} />
         <DetailItem label="Last Active" value={u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString("id-ID") : "—"} />
         <DetailItem label="Coach" value={u.isInstructor ? "Ya" : "Tidak"} />
+      </div>
+
+      <div className="border-t pt-3 space-y-2">
+        <Label htmlFor="dialog-membership">Membership</Label>
+        <div className="flex items-end gap-2">
+          <Select
+            value={membership}
+            onValueChange={(v) => setMembership(v === "gold" ? "gold" : "basic")}
+            disabled={membershipMutation.isPending}
+          >
+            <SelectTrigger id="dialog-membership" className="flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MEMBERSHIP_TIERS.map((tier) => (
+                <SelectItem key={tier} value={tier}>
+                  {tier === "gold" ? "Gold" : "Basic"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            size="sm"
+            disabled={membershipMutation.isPending || membership === currentTier}
+            onClick={() => membershipMutation.mutate()}
+          >
+            Simpan
+          </Button>
+        </div>
       </div>
 
       {u.membership && (

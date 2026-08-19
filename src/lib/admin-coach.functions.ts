@@ -65,7 +65,7 @@ export const getCoachById = createServerFn({ method: "POST" })
     const { data: coach, error } = await supabaseAdmin
       .from("coaches")
       .select(
-        "id, user_id, display_name, avatar_url, hourly_rate_idr, open_to_book, avg_rating, total_raters, bio, daily_break_start, daily_break_end, hub_setup_at",
+        "id, user_id, display_name, avatar_url, avatar_storage_path, hourly_rate_idr, court_fee_included, open_to_book, avg_rating, total_raters, bio, daily_break_start, daily_break_end, hub_setup_at",
       )
       .eq("id", data.coachId)
       .maybeSingle();
@@ -167,7 +167,100 @@ export const saveCoachWeeklySchedule = createServerFn({ method: "POST" })
       p_complete_setup: true,
     });
     if (error) throw new Error(error.message);
+
+    const { error: availErr } = await supabaseAdmin
+      .from("coaches")
+      .update({ open_to_book: weeklyHours.length > 0 })
+      .eq("id", data.coachId);
+    if (availErr) throw new Error(availErr.message);
+
     return { ok: true };
+  });
+
+const coachProfileSchema = z.object({
+  coachId: z.string().uuid(),
+  displayName: z.string().trim().min(1, "Nama coach wajib diisi.").max(120),
+  bio: z.string().max(4000).optional().default(""),
+  hourlyRateIdr: z.number().int().min(0).max(50_000_000),
+  courtFeeIncluded: z.boolean(),
+  avatarUrl: z.string().optional().default(""),
+  avatarStoragePath: z.string().nullable().optional(),
+});
+
+export const updateCoachProfile = createServerFn({ method: "POST" })
+  .middleware([requireSuperadminAuth])
+  .inputValidator((input) => coachProfileSchema.parse(input))
+  .handler(async ({ context, data }) => {
+    await assertSuperadmin(context.userId);
+
+    const { data: existing, error: findErr } = await supabaseAdmin
+      .from("coaches")
+      .select("id, avatar_storage_path")
+      .eq("id", data.coachId)
+      .maybeSingle();
+    if (findErr) throw new Error(findErr.message);
+    if (!existing) throw new Error("Coach tidak ditemukan.");
+
+    const patch: {
+      display_name: string;
+      bio: string;
+      hourly_rate_idr: number;
+      court_fee_included: boolean;
+      avatar_url?: string | null;
+      avatar_storage_path?: string | null;
+    } = {
+      display_name: data.displayName,
+      bio: data.bio ?? "",
+      hourly_rate_idr: data.hourlyRateIdr,
+      court_fee_included: data.courtFeeIncluded,
+    };
+    if (data.avatarStoragePath !== undefined) {
+      patch.avatar_url = data.avatarUrl || null;
+      patch.avatar_storage_path = data.avatarStoragePath;
+      if (
+        existing.avatar_storage_path &&
+        existing.avatar_storage_path !== data.avatarStoragePath
+      ) {
+        await supabaseAdmin.storage.from("coach-assets").remove([existing.avatar_storage_path]);
+      }
+    }
+
+    const { error } = await supabaseAdmin.from("coaches").update(patch).eq("id", data.coachId);
+    if (error) throw new Error(error.message);
+
+    return { ok: true as const, displayName: data.displayName };
+  });
+
+export const uploadCoachAvatar = createServerFn({ method: "POST" })
+  .middleware([requireSuperadminAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        coachId: z.string().uuid(),
+        fileName: z.string().min(1),
+        fileBase64: z.string().min(1),
+        contentType: z.string().min(1),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    await assertSuperadmin(context.userId);
+    const bucket = "coach-assets";
+    const ext = (data.fileName.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+    const path = `avatars/${data.coachId}/${Date.now()}.${ext}`;
+
+    const buffer = Buffer.from(data.fileBase64, "base64");
+    const { error: uploadErr } = await supabaseAdmin.storage.from(bucket).upload(path, buffer, {
+      contentType: data.contentType,
+      upsert: true,
+    });
+    if (uploadErr) throw new Error(uploadErr.message);
+
+    const { data: urlData } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
+    return {
+      avatarUrl: urlData.publicUrl,
+      avatarStoragePath: path,
+    };
   });
 
 export const toggleCoachSlotOverride = createServerFn({ method: "POST" })
