@@ -4,8 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
 import { id } from "date-fns/locale";
-import { ArrowLeft, CalendarIcon, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarClock, CalendarIcon, Loader2, Plus, Trash2, UserPen } from "lucide-react";
 import {
+  adminCreateCoachBooking,
   deleteCoachBooking,
   getCoachBookingDetail,
   getCoachById,
@@ -13,10 +14,14 @@ import {
   toggleCoachSlotOverride,
   type CoachHubGridCell,
 } from "@/lib/admin-coach.functions";
-import { CoachHubGrid, CoachHubLegend } from "@/components/admin/CoachHubGrid";
+import { CoachHubGrid } from "@/components/admin/CoachHubGrid";
 import { EditCoachProfileDialog } from "@/components/admin/EditCoachProfileDialog";
+import { EditCoachScheduleDialog } from "@/components/admin/EditCoachScheduleDialog";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
@@ -56,13 +61,22 @@ function CoachHubPage() {
   const [calOpen, setCalOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [jadwalOpen, setJadwalOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+
+  const [bookOpen, setBookOpen] = useState(false);
+  const [bookName, setBookName] = useState("");
+  const [bookCourt, setBookCourt] = useState("1");
+  const [bookTimeStart, setBookTimeStart] = useState("08:00");
+  const [bookTimeEnd, setBookTimeEnd] = useState("09:00");
+  const [bookCategory, setBookCategory] = useState<string>("");
 
   const fetchCoach = useServerFn(getCoachById);
   const fetchGrid = useServerFn(getCoachHubGrid);
   const fetchDetail = useServerFn(getCoachBookingDetail);
   const toggleSlot = useServerFn(toggleCoachSlotOverride);
   const deleteBooking = useServerFn(deleteCoachBooking);
+  const createBooking = useServerFn(adminCreateCoachBooking);
 
   const { data: coachData } = useQuery({
     queryKey: ["admin", "coach", coachId],
@@ -102,6 +116,37 @@ function CoachHubPage() {
       toast.success("Booking coach dihapus.");
       setDetailOpen(false);
       setSelectedBookingId(null);
+      void queryClient.invalidateQueries({ queryKey: ["admin", "coach", coachId, "hub", selectedDate] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const bookMutation = useMutation({
+    mutationFn: () => {
+      const [sh, sm] = bookTimeStart.split(":").map(Number);
+      const [eh, em] = bookTimeEnd.split(":").map(Number);
+      const dur = (eh * 60 + em - sh * 60 - sm) / 60;
+      if (dur <= 0) throw new Error("Jam berakhir harus lebih besar dari jam mulai.");
+      return createBooking({
+        data: {
+          coachId,
+          date: selectedDate,
+          startTime: bookTimeStart,
+          durationHours: dur,
+          courtNumber: parseInt(bookCourt, 10),
+          bookerName: bookName,
+          category: bookCategory === "" ? undefined : (bookCategory as "coaching" | "coaching_program" | "social_play"),
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Booking berhasil dibuat.");
+      setBookOpen(false);
+      setBookName("");
+      setBookCourt("1");
+      setBookTimeStart("08:00");
+      setBookTimeEnd("09:00");
+      setBookCategory("");
       void queryClient.invalidateQueries({ queryKey: ["admin", "coach", coachId, "hub", selectedDate] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -147,30 +192,34 @@ function CoachHubPage() {
   const court = bookingDetail?.court;
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 max-w-[1200px]">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="p-4 lg:p-6 space-y-4 h-screen flex flex-col">
+      <div className="flex items-center justify-between">
         <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link to="/admin/coach">
             <ArrowLeft className="h-4 w-4 mr-1" />
             Kembali
           </Link>
         </Button>
-      </div>
-
-      <div className="flex gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-12 flex-1 justify-start bg-white"
-          onClick={() => setProfileOpen(true)}
-        >
-          Edit Profile
-        </Button>
-        <Button asChild variant="outline" className="h-12 flex-1 justify-start bg-white">
-          <Link to="/admin/coach/$coachId/jadwal" params={{ coachId }}>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            className="bg-[#244827] hover:bg-[#1a351d] text-white"
+            onClick={() => setProfileOpen(true)}
+          >
+            <UserPen className="h-4 w-4 mr-1.5" />
+            Edit Profile
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            className="bg-[#244827] hover:bg-[#1a351d] text-white"
+            onClick={() => setJadwalOpen(true)}
+          >
+            <CalendarClock className="h-4 w-4 mr-1.5" />
             Edit jadwal
-          </Link>
-        </Button>
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -180,7 +229,7 @@ function CoachHubPage() {
             type="button"
             onClick={() => setSelectedDate(d.ymd)}
             className={cn(
-              "shrink-0 rounded-xl px-4 py-2 text-center min-w-[4.5rem] border transition-colors",
+              "shrink-0 rounded-xl px-3 py-1.5 text-center min-w-[4rem] border transition-colors",
               selectedDate === d.ymd
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-card hover:bg-muted/50",
@@ -192,7 +241,7 @@ function CoachHubPage() {
         ))}
         <Popover open={calOpen} onOpenChange={setCalOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="icon" className="shrink-0">
+            <Button variant="outline" size="icon" className="shrink-0 h-8 w-8">
               <CalendarIcon className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
@@ -212,28 +261,116 @@ function CoachHubPage() {
         </Popover>
       </div>
 
-      <div>
+      <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Jadwal {coachName}</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Klik slot tersedia untuk memblokir, klik diblokir untuk membuka, klik booked untuk detail.
-        </p>
+        <Button size="sm" onClick={() => setBookOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Booking
+        </Button>
       </div>
 
-      <CoachHubLegend />
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded-full px-3 py-1 text-xs font-medium bg-orange-100 text-orange-900 border border-orange-200">
+          Diblokir
+        </span>
+        <span className="rounded-full px-3 py-1 text-xs font-medium bg-blue-100 text-blue-900 border border-blue-200">
+          Coaching Program
+        </span>
+        <span className="rounded-full px-3 py-1 text-xs font-medium bg-green-100 text-green-900 border border-green-200">
+          Social Play
+        </span>
+      </div>
 
-      {gridLoad ? (
-        <div className="flex justify-center py-16 text-muted-foreground">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      ) : (
-        <CoachHubGrid cells={cells} onCellClick={handleCellClick} />
-      )}
+      <div className="flex-1 min-h-0 overflow-auto">
+        {gridLoad ? (
+          <div className="flex justify-center py-16 text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : (
+          <CoachHubGrid cells={cells} onCellClick={handleCellClick} />
+        )}
+      </div>
+
+      <Dialog open={bookOpen} onOpenChange={setBookOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Booking Jadwal Coach</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Atas nama</Label>
+              <Input
+                placeholder="Nama pembooking"
+                value={bookName}
+                onChange={(e) => setBookName(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Jam mulai</Label>
+                <Input
+                  type="time"
+                  value={bookTimeStart}
+                  onChange={(e) => setBookTimeStart(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Jam berakhir</Label>
+                <Input
+                  type="time"
+                  value={bookTimeEnd}
+                  onChange={(e) => setBookTimeEnd(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Lapangan</Label>
+                <Select value={bookCourt} onValueChange={setBookCourt}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((c) => (
+                      <SelectItem key={c} value={String(c)}>LAP {c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Kategori <span className="text-muted-foreground">(opsional)</span></Label>
+                <Select value={bookCategory} onValueChange={setBookCategory}>
+                  <SelectTrigger><SelectValue placeholder="Pilih..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="coaching">Coaching</SelectItem>
+                    <SelectItem value="coaching_program">Coaching Program</SelectItem>
+                    <SelectItem value="social_play">Social Play</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              disabled={!bookName.trim() || bookMutation.isPending}
+              onClick={() => bookMutation.mutate()}
+            >
+              {bookMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Buat Booking
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <EditCoachProfileDialog
         coachId={coachId}
         coach={coachData?.coach}
         open={profileOpen}
         onOpenChange={setProfileOpen}
+      />
+
+      <EditCoachScheduleDialog
+        coachId={coachId}
+        open={jadwalOpen}
+        onOpenChange={setJadwalOpen}
       />
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>

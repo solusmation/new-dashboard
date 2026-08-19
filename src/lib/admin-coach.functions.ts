@@ -340,11 +340,87 @@ export const deleteCoachBooking = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context.userId);
+
+    const { data: booking, error: findErr } = await supabaseAdmin
+      .from("coach_bookings")
+      .select("id, court_booking_id")
+      .eq("id", data.bookingId)
+      .maybeSingle();
+    if (findErr) throw new Error(findErr.message);
+    if (!booking) throw new Error("Booking tidak ditemukan.");
+
     const { error } = await supabaseAdmin
       .from("coach_bookings")
       .delete()
       .eq("id", data.bookingId);
     if (error) throw new Error(error.message);
+
+    if (booking.court_booking_id) {
+      await supabaseAdmin
+        .from("court_bookings")
+        .delete()
+        .eq("id", booking.court_booking_id);
+    }
+
+    return { ok: true };
+  });
+
+const adminBookCoachSchema = z.object({
+  coachId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/),
+  durationHours: z.number().int().min(1).max(8),
+  courtNumber: z.number().int().min(1).max(8),
+  bookerName: z.string().trim().min(1, "Nama wajib diisi."),
+  category: z.enum(["coaching", "coaching_program", "social_play"]).optional(),
+});
+
+export const adminCreateCoachBooking = createServerFn({ method: "POST" })
+  .middleware([requireSuperadminAuth])
+  .inputValidator((input) => adminBookCoachSchema.parse(input))
+  .handler(async ({ context, data }) => {
+    await assertSuperadmin(context.userId);
+
+    const { data: coach, error: coachErr } = await supabaseAdmin
+      .from("coaches")
+      .select("id, user_id, hourly_rate_idr")
+      .eq("id", data.coachId)
+      .maybeSingle();
+    if (coachErr) throw new Error(coachErr.message);
+    if (!coach) throw new Error("Coach tidak ditemukan.");
+
+    const startTimeFull = `${data.startTime}:00`;
+    const coachFee = coach.hourly_rate_idr ?? 0;
+
+    const { data: courtBooking, error: courtErr } = await supabaseAdmin
+      .from("court_bookings")
+      .insert({
+        user_id: coach.user_id,
+        booking_date: data.date,
+        start_time: startTimeFull,
+        duration_hours: data.durationHours,
+        court_numbers: [data.courtNumber],
+        courts_count: 1,
+        booking_type: "coaching",
+        total_amount_idr: 0,
+      })
+      .select("id")
+      .single();
+    if (courtErr) throw new Error(courtErr.message);
+
+    const { error: cbErr } = await supabaseAdmin.from("coach_bookings").insert({
+      instructor_id: data.coachId,
+      user_id: coach.user_id,
+      booking_date: data.date,
+      start_time: startTimeFull,
+      duration_hours: data.durationHours,
+      coach_fee_idr: coachFee,
+      court_booking_id: courtBooking.id,
+      status: "confirmed",
+      booker_name: data.bookerName,
+    });
+    if (cbErr) throw new Error(cbErr.message);
+
     return { ok: true };
   });
 

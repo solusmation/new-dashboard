@@ -91,7 +91,8 @@ export function CoachHubGrid({ cells, courtNumbers, onCellClick }: CoachHubGridP
     cellMap.set(`${c.court_number}:${c.start_time.slice(0, 5)}`, c);
   }
 
-  const hourRows = HUB_HOURS.slice(0, -1);
+  const activeHours = [...new Set(cells.map((c) => c.start_time.slice(0, 5)))].sort();
+  const hourRows = activeHours.length > 0 ? activeHours : HUB_HOURS.slice(0, -1);
 
   return (
     <div className="overflow-x-auto rounded-xl border bg-card">
