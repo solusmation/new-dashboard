@@ -1,12 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Ticket } from "lucide-react";
-import * as React from "react";
 import { listVouchers } from "@/lib/admin-voucher.functions";
 import { VOUCHER_STATUS_LABEL, voucherStatusBadgeVariant } from "@/lib/voucher-display";
-import { formatStarCost } from "@/lib/reward-display";
-import { VoucherFormDialog } from "@/components/admin/VoucherFormDialog";
+import { formatStarCost } from "@/lib/star-display";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -17,7 +15,6 @@ export const Route = createFileRoute("/admin/voucher/")({
 function VoucherListPage() {
   const navigate = useNavigate();
   const fetchList = useServerFn(listVouchers);
-  const [dialogOpen, setDialogOpen] = React.useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "voucher", "list"],
@@ -36,9 +33,11 @@ function VoucherListPage() {
           <Ticket className="h-4 w-4" />
           Total voucher: {isLoading ? "…" : rows.length}
         </div>
-        <Button type="button" size="sm" className="gap-1.5" onClick={() => setDialogOpen(true)}>
-          <Plus className="size-4" />
-          Buat voucher
+        <Button type="button" size="sm" className="gap-1.5" asChild>
+          <Link to="/admin/voucher/create">
+            <Plus className="size-4" />
+            Buat voucher
+          </Link>
         </Button>
       </div>
 
@@ -64,8 +63,13 @@ function VoucherListPage() {
                 <td className="px-4 py-3 font-medium">
                   <div className="flex flex-wrap items-center gap-2">
                     <span>{item.name}</span>
-                    {item.linked_reward ? (
-                      <Badge variant="outline">{formatStarCost(item.linked_reward.star_cost)}</Badge>
+                    {item.is_purchasable && item.star_cost ? (
+                      <Badge variant="outline">{formatStarCost(item.star_cost)}</Badge>
+                    ) : null}
+                    {item.stock_limit !== null && item.stock_limit !== undefined ? (
+                      <Badge variant="secondary">
+                        Stok: {item.redeemed_count}/{item.stock_limit}
+                      </Badge>
                     ) : null}
                   </div>
                 </td>
@@ -103,8 +107,6 @@ function VoucherListPage() {
           </tbody>
         </table>
       </div>
-
-      <VoucherFormDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }

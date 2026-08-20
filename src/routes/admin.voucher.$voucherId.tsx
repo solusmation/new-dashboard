@@ -12,7 +12,7 @@ import {
   VOUCHER_STATUS_LABEL,
   voucherStatusBadgeVariant,
 } from "@/lib/voucher-display";
-import { formatStarCost } from "@/lib/reward-display";
+import { formatStarCost } from "@/lib/star-display";
 import { VoucherAddRecipientsDialog } from "@/components/admin/VoucherAddRecipientsDialog";
 import { VoucherFormDialog, type VoucherFormInitial } from "@/components/admin/VoucherFormDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -190,6 +190,9 @@ function VoucherDetailPage() {
         bg_color: voucher.bg_color,
         image_url: voucher.image_url,
         image_storage_path: voucher.image_storage_path,
+        is_purchasable: voucher.is_purchasable,
+        star_cost: voucher.star_cost,
+        stock_limit: voucher.stock_limit,
       }
     : null;
 
@@ -211,16 +214,13 @@ function VoucherDetailPage() {
                 {VOUCHER_STATUS_LABEL[voucher.status]}
               </Badge>
               {voucher.assign_to_all ? <Badge variant="secondary">Semua pengguna</Badge> : null}
-              {voucher.linked_reward ? (
-                <Button type="button" variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
-                  <Link
-                    to="/admin/reward/$rewardId"
-                    params={{ rewardId: voucher.linked_reward.id }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Tersedia di Reward · {formatStarCost(voucher.linked_reward.star_cost)}
-                  </Link>
-                </Button>
+              {voucher.is_purchasable && voucher.star_cost ? (
+                <Badge variant="outline">{formatStarCost(voucher.star_cost)}</Badge>
+              ) : null}
+              {voucher.stock_limit !== null && voucher.stock_limit !== undefined ? (
+                <Badge variant="secondary">
+                  Stok: {voucher.redeemed_count}/{voucher.stock_limit}
+                </Badge>
               ) : null}
             </div>
           ) : null}

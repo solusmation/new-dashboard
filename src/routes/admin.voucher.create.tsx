@@ -1,25 +1,23 @@
 "use client";
 
-import * as React from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateVoucher, uploadVoucherImage } from "@/lib/admin-voucher.functions";
+import { createVoucher, uploadVoucherImage } from "@/lib/admin-voucher.functions";
 import { VoucherImageCropper } from "@/components/admin/VoucherImageCropper";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { ImagePlus, X } from "lucide-react";
+import { ArrowLeft, ImagePlus, X } from "lucide-react";
+import * as React from "react";
 import { toast } from "sonner";
+
+export const Route = createFileRoute("/admin/voucher/create")({
+  component: VoucherCreatePage,
+});
 
 const BG_PRESETS = [
   "#1a1a2e",
@@ -36,37 +34,6 @@ const BG_PRESETS = [
   "#f4a261",
 ] as const;
 
-export type VoucherFormInitial = {
-  id: string;
-  name: string;
-  description: string;
-  how_to_get: string;
-  how_to_use: string;
-  terms_and_conditions: string;
-  valid_from: string;
-  valid_until: string;
-  bg_color?: string;
-  image_url?: string | null;
-  image_storage_path?: string | null;
-  is_purchasable?: boolean;
-  star_cost?: number | null;
-  stock_limit?: number | null;
-};
-
-type Props = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  voucher?: VoucherFormInitial | null;
-};
-
-function toLocalInput(iso: string | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 function localToIso(local: string, label: string): string {
   if (!local) throw new Error(`${label} wajib diisi.`);
   const d = new Date(local);
@@ -74,7 +41,8 @@ function localToIso(local: string, label: string): string {
   return d.toISOString();
 }
 
-export function VoucherFormDialog({ open, onOpenChange, voucher }: Props) {
+function VoucherCreatePage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [name, setName] = React.useState("");
@@ -92,73 +60,24 @@ export function VoucherFormDialog({ open, onOpenChange, voucher }: Props) {
 
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
   const [imageBase64, setImageBase64] = React.useState<string | null>(null);
-  const [imageStoragePath, setImageStoragePath] = React.useState<string | null>(null);
-  const [imageUrl, setImageUrl] = React.useState<string>("");
-  const [imageChanged, setImageChanged] = React.useState(false);
+  const [imageUrl, setImageUrl] = React.useState("");
 
   const [cropperOpen, setCropperOpen] = React.useState(false);
-  const [rawImageSrc, setRawImageSrc] = React.useState<string>("");
+  const [rawImageSrc, setRawImageSrc] = React.useState("");
   const [rawFileName, setRawFileName] = React.useState("image.webp");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => {
-    if (!open) return;
-    if (voucher) {
-      setName(voucher.name);
-      setValidFrom(toLocalInput(voucher.valid_from));
-      setValidUntil(toLocalInput(voucher.valid_until));
-      setDescription(voucher.description ?? "");
-      setHowToGet(voucher.how_to_get ?? "");
-      setHowToUse(voucher.how_to_use ?? "");
-      setTerms(voucher.terms_and_conditions ?? "");
-      setBgColor(voucher.bg_color ?? "#1a1a2e");
-      setIsPurchasable(voucher.is_purchasable ?? false);
-      setStarCost(voucher.star_cost ? String(voucher.star_cost) : "");
-      if (voucher.stock_limit === null || voucher.stock_limit === undefined) {
-        setStockMode("unlimited");
-        setStockLimit("");
-      } else {
-        setStockMode("limited");
-        setStockLimit(String(voucher.stock_limit));
-      }
-      setImagePreview(voucher.image_url ?? null);
-      setImageBase64(null);
-      setImageStoragePath(voucher.image_storage_path ?? null);
-      setImageUrl(voucher.image_url ?? "");
-      setImageChanged(false);
-    } else {
-      setName("");
-      setValidFrom("");
-      setValidUntil("");
-      setDescription("");
-      setHowToGet("");
-      setHowToUse("");
-      setTerms("");
-      setBgColor("#1a1a2e");
-      setIsPurchasable(false);
-      setStarCost("");
-      setStockMode("unlimited");
-      setStockLimit("");
-      setImagePreview(null);
-      setImageBase64(null);
-      setImageStoragePath(null);
-      setImageUrl("");
-      setImageChanged(false);
-    }
-  }, [open, voucher]);
-
-  const updateFn = useServerFn(updateVoucher);
+  const createFn = useServerFn(createVoucher);
   const uploadFn = useServerFn(uploadVoucherImage);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       let finalImageUrl = imageUrl;
-      let finalImageStoragePath = imageStoragePath;
+      let finalImageStoragePath: string | null = null;
 
-      if (imageBase64 && imageChanged) {
+      if (imageBase64) {
         const uploaded = await uploadFn({
           data: {
-            voucherId: voucher?.id,
             fileName: rawFileName,
             fileBase64: imageBase64,
             contentType: "image/webp",
@@ -166,11 +85,6 @@ export function VoucherFormDialog({ open, onOpenChange, voucher }: Props) {
         });
         finalImageUrl = uploaded.imageUrl;
         finalImageStoragePath = uploaded.imageStoragePath;
-      }
-
-      if (imageChanged && !imageBase64) {
-        finalImageUrl = "";
-        finalImageStoragePath = null;
       }
 
       let parsedStarCost: number | null = null;
@@ -182,36 +96,35 @@ export function VoucherFormDialog({ open, onOpenChange, voucher }: Props) {
       }
 
       let parsedStockLimit: number | null = null;
-      if (stockMode === "limited") {
+      if (isPurchasable && stockMode === "limited") {
         parsedStockLimit = parseInt(stockLimit, 10);
         if (!Number.isFinite(parsedStockLimit) || parsedStockLimit < 1) {
           throw new Error("Jumlah stok wajib diisi (minimal 1).");
         }
       }
 
-      const payload = {
-        name: name.trim(),
-        description: description.trim(),
-        howToGet: howToGet.trim(),
-        howToUse: howToUse.trim(),
-        termsAndConditions: terms.trim(),
-        validFrom: localToIso(validFrom, "Tanggal mulai"),
-        validUntil: localToIso(validUntil, "Tanggal selesai"),
-        bgColor,
-        imageUrl: finalImageUrl,
-        imageStoragePath: imageChanged ? finalImageStoragePath : undefined,
-        isPurchasable,
-        starCost: parsedStarCost,
-        stockLimit: parsedStockLimit,
-      };
-
-      if (!voucher) throw new Error("Voucher data is required for edit.");
-      return updateFn({ data: { voucherId: voucher.id, ...payload } });
+      return createFn({
+        data: {
+          name: name.trim(),
+          description: description.trim(),
+          howToGet: howToGet.trim(),
+          howToUse: howToUse.trim(),
+          termsAndConditions: terms.trim(),
+          validFrom: localToIso(validFrom, "Tanggal mulai"),
+          validUntil: localToIso(validUntil, "Tanggal selesai"),
+          bgColor,
+          imageUrl: finalImageUrl,
+          imageStoragePath: finalImageStoragePath,
+          isPurchasable,
+          starCost: parsedStarCost,
+          stockLimit: parsedStockLimit,
+        },
+      });
     },
-    onSuccess: () => {
-      toast.success("Voucher berhasil diperbarui.");
-      onOpenChange(false);
+    onSuccess: (res) => {
+      toast.success("Voucher berhasil dibuat.");
       void queryClient.invalidateQueries({ queryKey: ["admin", "voucher"] });
+      void navigate({ to: "/admin/voucher/$voucherId", params: { voucherId: res.id } });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -240,24 +153,28 @@ export function VoucherFormDialog({ open, onOpenChange, voucher }: Props) {
   function handleCropDone(result: { base64: string; previewUrl: string }) {
     setImagePreview(result.previewUrl);
     setImageBase64(result.base64);
-    setImageChanged(true);
   }
 
   function handleRemoveImage() {
     setImagePreview(null);
     setImageBase64(null);
-    setImageChanged(true);
   }
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit voucher</DialogTitle>
-          </DialogHeader>
+      <div className="space-y-6">
+        <div className="space-y-1">
+          <Button type="button" variant="ghost" size="sm" className="-ml-2" asChild>
+            <Link to="/admin/voucher">
+              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              Kembali
+            </Link>
+          </Button>
+          <h2 className="text-xl font-semibold">Buat voucher</h2>
+        </div>
 
-          <div className="space-y-4 py-1">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="voucher-name">Nama Voucher</Label>
               <Input
@@ -268,7 +185,7 @@ export function VoucherFormDialog({ open, onOpenChange, voucher }: Props) {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="voucher-from">Mulai berlaku</Label>
                 <Input
@@ -362,6 +279,9 @@ export function VoucherFormDialog({ open, onOpenChange, voucher }: Props) {
               />
             </div>
 
+          </div>
+
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="voucher-desc">Description (opsional)</Label>
               <Textarea
@@ -405,78 +325,79 @@ export function VoucherFormDialog({ open, onOpenChange, voucher }: Props) {
                 placeholder="Tidak dapat digabung dengan promo lain, dll."
               />
             </div>
+          </div>
+        </div>
 
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="voucher-purchasable">Bisa dibeli dengan Star</Label>
-              <Switch
-                id="voucher-purchasable"
-                checked={isPurchasable}
-                onCheckedChange={setIsPurchasable}
-              />
-            </div>
-
-            {isPurchasable ? (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="voucher-star-cost">Harga Star</Label>
-                  <Input
-                    id="voucher-star-cost"
-                    type="number"
-                    min={1}
-                    value={starCost}
-                    onChange={(e) => setStarCost(e.target.value)}
-                    placeholder="Contoh: 60"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Stok</Label>
-                  <RadioGroup
-                    value={stockMode}
-                    onValueChange={(v) => setStockMode(v as "unlimited" | "limited")}
-                    className="gap-3"
-                  >
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem value="unlimited" id="voucher-stock-unlimited" />
-                      <Label htmlFor="voucher-stock-unlimited" className="font-normal cursor-pointer">
-                        Tanpa batas
-                      </Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem value="limited" id="voucher-stock-limited" />
-                      <Label htmlFor="voucher-stock-limited" className="font-normal cursor-pointer">
-                        Terbatas
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                  {stockMode === "limited" ? (
-                    <Input
-                      type="number"
-                      min={1}
-                      value={stockLimit}
-                      onChange={(e) => setStockLimit(e.target.value)}
-                      placeholder="Contoh: 100"
-                    />
-                  ) : null}
-                </div>
-              </>
-            ) : null}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="voucher-purchasable">Bisa dibeli dengan Star</Label>
+            <Switch
+              id="voucher-purchasable"
+              checked={isPurchasable}
+              onCheckedChange={setIsPurchasable}
+            />
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Batal
-            </Button>
-            <Button
-              type="button"
-              disabled={saveMutation.isPending || !name.trim()}
-              onClick={() => saveMutation.mutate()}
-            >
-              {saveMutation.isPending ? "Menyimpan…" : "Simpan"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {isPurchasable ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="voucher-star-cost">Harga Star</Label>
+                <Input
+                  id="voucher-star-cost"
+                  type="number"
+                  min={1}
+                  value={starCost}
+                  onChange={(e) => setStarCost(e.target.value)}
+                  placeholder="Contoh: 60"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Stok</Label>
+                <RadioGroup
+                  value={stockMode}
+                  onValueChange={(v) => setStockMode(v as "unlimited" | "limited")}
+                  className="gap-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="unlimited" id="voucher-stock-unlimited" />
+                    <Label htmlFor="voucher-stock-unlimited" className="font-normal cursor-pointer">
+                      Tanpa batas
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="limited" id="voucher-stock-limited" />
+                    <Label htmlFor="voucher-stock-limited" className="font-normal cursor-pointer">
+                      Terbatas
+                    </Label>
+                  </div>
+                </RadioGroup>
+                {stockMode === "limited" ? (
+                  <Input
+                    type="number"
+                    min={1}
+                    value={stockLimit}
+                    onChange={(e) => setStockLimit(e.target.value)}
+                    placeholder="Contoh: 100"
+                  />
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="outline" asChild>
+            <Link to="/admin/voucher">Batal</Link>
+          </Button>
+          <Button
+            type="button"
+            disabled={saveMutation.isPending || !name.trim()}
+            onClick={() => saveMutation.mutate()}
+          >
+            {saveMutation.isPending ? "Menyimpan…" : "Simpan"}
+          </Button>
+        </div>
+      </div>
 
       <VoucherImageCropper
         open={cropperOpen}

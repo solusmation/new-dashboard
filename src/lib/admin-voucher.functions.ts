@@ -20,16 +20,14 @@ const voucherPayloadSchema = z.object({
   bgColor: z.string().max(30).optional().default("#1a1a2e"),
   imageUrl: z.string().optional().default(""),
   imageStoragePath: z.string().nullable().optional(),
+  isPurchasable: z.boolean().optional().default(false),
+  starCost: z.number().int().min(1).nullable().optional().default(null),
+  stockLimit: z.number().int().min(1).nullable().optional().default(null),
 });
-
-export type VoucherLinkedReward = {
-  id: string;
-  star_cost: number;
-  is_active: boolean;
-};
 
 export type VoucherListItem = {
   id: string;
+  category: "regular" | "reward";
   name: string;
   description: string;
   how_to_get: string;
@@ -40,12 +38,15 @@ export type VoucherListItem = {
   assign_to_all: boolean;
   created_at: string;
   updated_at: string;
+  is_purchasable: boolean;
+  star_cost: number | null;
+  stock_limit: number | null;
+  redeemed_count: number;
   issued_count: number;
   used_count: number;
   unused_count: number;
   expired_unused_count: number;
   status: ReturnType<typeof getVoucherCampaignStatus>;
-  linked_reward: VoucherLinkedReward | null;
 };
 
 export type VoucherRecipient = {
@@ -114,14 +115,13 @@ export const listVouchers = createServerFn({ method: "GET" })
     const { data: vouchers, error } = await supabaseAdmin
       .from("vouchers")
       .select(
-        "id, name, description, how_to_get, how_to_use, terms_and_conditions, valid_from, valid_until, assign_to_all, created_at, updated_at, bg_color, image_url, image_storage_path",
+        "id, category, name, description, how_to_get, how_to_use, terms_and_conditions, valid_from, valid_until, assign_to_all, created_at, updated_at, bg_color, image_url, image_storage_path, is_purchasable, star_cost, stock_limit, redeemed_count",
       )
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
     const ids = (vouchers ?? []).map((v) => v.id);
     const counts = new Map<string, { issued: number; used: number }>();
-    const linked = new Map<string, VoucherLinkedReward>();
     if (ids.length > 0) {
       const { data: codes, error: codesErr } = await supabaseAdmin
         .from("voucher_codes")
@@ -135,19 +135,6 @@ export const listVouchers = createServerFn({ method: "GET" })
         counts.set(row.voucher_id, cur);
       }
 
-      const { data: rewardRows, error: rewardErr } = await supabaseAdmin
-        .from("rewards")
-        .select("id, voucher_id, star_cost, is_active")
-        .in("voucher_id", ids);
-      if (rewardErr) throw new Error(rewardErr.message);
-      for (const row of rewardRows ?? []) {
-        if (!row.voucher_id) continue;
-        linked.set(row.voucher_id, {
-          id: row.id,
-          star_cost: row.star_cost,
-          is_active: row.is_active,
-        });
-      }
     }
 
     const now = new Date();
@@ -162,7 +149,6 @@ export const listVouchers = createServerFn({ method: "GET" })
         unused_count: Math.max(0, c.issued - c.used),
         expired_unused_count: expiredUnused,
         status,
-        linked_reward: linked.get(v.id) ?? null,
       };
     });
 
@@ -176,7 +162,7 @@ export const getVoucherDetail = createServerFn({ method: "POST" })
     const { data: voucher, error } = await supabaseAdmin
       .from("vouchers")
       .select(
-        "id, name, description, how_to_get, how_to_use, terms_and_conditions, valid_from, valid_until, assign_to_all, created_at, updated_at, created_by, bg_color, image_url, image_storage_path",
+        "id, category, name, description, how_to_get, how_to_use, terms_and_conditions, valid_from, valid_until, assign_to_all, created_at, updated_at, created_by, bg_color, image_url, image_storage_path, is_purchasable, star_cost, stock_limit, redeemed_count",
       )
       .eq("id", data.voucherId)
       .maybeSingle();
@@ -242,24 +228,10 @@ export const getVoucherDetail = createServerFn({ method: "POST" })
       { hour: 0, count: 0 },
     );
 
-    const { data: linkedReward, error: linkedErr } = await supabaseAdmin
-      .from("rewards")
-      .select("id, star_cost, is_active")
-      .eq("voucher_id", data.voucherId)
-      .maybeSingle();
-    if (linkedErr) throw new Error(linkedErr.message);
-
     return {
       voucher: {
         ...voucher,
         status: getVoucherCampaignStatus(voucher.valid_from, voucher.valid_until, now),
-        linked_reward: linkedReward
-          ? {
-              id: linkedReward.id,
-              star_cost: linkedReward.star_cost,
-              is_active: linkedReward.is_active,
-            }
-          : null,
       },
       recipients,
       analytics: {
@@ -341,6 +313,9 @@ export const createVoucher = createServerFn({ method: "POST" })
         bg_color: data.bgColor ?? "#1a1a2e",
         image_url: data.imageUrl || null,
         image_storage_path: data.imageStoragePath ?? null,
+        is_purchasable: data.isPurchasable ?? false,
+        star_cost: data.isPurchasable ? data.starCost : null,
+        stock_limit: data.stockLimit ?? null,
       })
       .select("id")
       .single();
@@ -378,6 +353,9 @@ export const updateVoucher = createServerFn({ method: "POST" })
       valid_from: string;
       valid_until: string;
       bg_color: string;
+      is_purchasable: boolean;
+      star_cost: number | null;
+      stock_limit: number | null;
       image_url?: string | null;
       image_storage_path?: string | null;
     } = {
@@ -389,6 +367,9 @@ export const updateVoucher = createServerFn({ method: "POST" })
       valid_from: data.validFrom,
       valid_until: data.validUntil,
       bg_color: data.bgColor ?? "#1a1a2e",
+      is_purchasable: data.isPurchasable ?? false,
+      star_cost: data.isPurchasable ? data.starCost ?? null : null,
+      stock_limit: data.stockLimit ?? null,
     };
 
     if (data.imageStoragePath !== undefined) {
@@ -409,27 +390,6 @@ export const updateVoucher = createServerFn({ method: "POST" })
       .update(patch)
       .eq("id", data.voucherId);
     if (error) throw new Error(error.message);
-
-    const linkedPatch: {
-      name: string;
-      description: string;
-      how_to_use: string;
-      terms_and_conditions: string;
-      image_url?: string | null;
-    } = {
-      name: data.name,
-      description: (data.description ?? "").trim() || data.name,
-      how_to_use: data.howToUse ?? "",
-      terms_and_conditions: data.termsAndConditions ?? "",
-    };
-    if (data.imageStoragePath !== undefined) {
-      linkedPatch.image_url = data.imageUrl || null;
-    }
-    const { error: syncErr } = await supabaseAdmin
-      .from("rewards")
-      .update(linkedPatch)
-      .eq("voucher_id", data.voucherId);
-    if (syncErr) throw new Error(syncErr.message);
 
     return { id: data.voucherId };
   });
@@ -515,18 +475,6 @@ export const deleteVoucher = createServerFn({ method: "POST" })
       .maybeSingle();
     if (fetchErr) throw new Error(fetchErr.message);
     if (!row) throw new Error("Voucher tidak ditemukan.");
-
-    const { data: linked, error: linkedErr } = await supabaseAdmin
-      .from("rewards")
-      .select("id, name")
-      .eq("voucher_id", data.voucherId)
-      .maybeSingle();
-    if (linkedErr) throw new Error(linkedErr.message);
-    if (linked) {
-      throw new Error(
-        `Voucher masih tertaut reward "${linked.name}". Hapus reward itu terlebih dahulu.`,
-      );
-    }
 
     const { error } = await supabaseAdmin.from("vouchers").delete().eq("id", data.voucherId);
     if (error) throw new Error(error.message);
