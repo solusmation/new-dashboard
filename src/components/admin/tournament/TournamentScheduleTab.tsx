@@ -94,12 +94,6 @@ export function TournamentScheduleTab({ tournamentId, matches }: Props) {
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["admin", "tournament", tournamentId] });
-    void queryClient.invalidateQueries({
-      queryKey: ["admin", "tournament", tournamentId, "schedule"],
-    });
-    void queryClient.invalidateQueries({
-      queryKey: ["admin", "tournament", tournamentId, "standings"],
-    });
   };
 
   if (sorted.length === 0) {

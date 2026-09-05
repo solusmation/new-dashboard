@@ -12,7 +12,12 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "db:status": "node scripts/supabase-db.mjs status",
+    "db:push": "node scripts/supabase-db.mjs push",
+    "db:query": "node scripts/supabase-db.mjs query",
+    "db:pull": "npx supabase db pull --linked",
+    "db:push:cli": "npx supabase db push --linked --yes"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

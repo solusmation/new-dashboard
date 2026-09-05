@@ -87,25 +87,22 @@ export const getCourtBookingsList = createServerFn({ method: "POST" })
     const limit = data.limit ?? 200;
     let q = supabaseAdmin
       .from("court_bookings")
-      .select("*")
+      .select(
+        "id, user_id, booking_date, start_time, duration_hours, court_numbers, booking_type, total_amount_idr, created_at, reference_id",
+      )
       .order("booking_date", { ascending: false })
       .order("start_time", { ascending: false })
       .limit(limit);
     if (data.from) q = q.gte("booking_date", data.from);
     if (data.to) q = q.lte("booking_date", data.to);
     if (data.bookingType) q = q.eq("booking_type", data.bookingType);
+    if (data.court != null) q = q.contains("court_numbers", [data.court]);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    let list = rows ?? [];
-    if (data.court != null) {
-      list = list.filter((r: { court_numbers?: number[] }) =>
-        (r.court_numbers ?? []).includes(data.court!),
-      );
-    }
-    return { rows: list };
+    return { rows: rows ?? [] };
   });
 
-/** Booking satu hari untuk grid jadwal + nama singkat dari profiles. */
+/** Booking satu hari untuk grid jadwal + nama singkat dari profiles + overlaps hari yang sama. */
 export const getCourtBookingsForScheduleDay = createServerFn({ method: "POST" })
   .middleware([requireSuperadminAuth])
   .inputValidator(
@@ -123,9 +120,10 @@ export const getCourtBookingsForScheduleDay = createServerFn({ method: "POST" })
       .eq("booking_date", data.date)
       .order("start_time", { ascending: true })
       .limit(200);
+    if (data.court != null) q = q.contains("court_numbers", [data.court]);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    let list = (rows ?? []) as Array<{
+    const list = (rows ?? []) as Array<{
       id: string;
       user_id: string;
       booking_date: string;
@@ -136,9 +134,6 @@ export const getCourtBookingsForScheduleDay = createServerFn({ method: "POST" })
       total_amount_idr: number;
       reference_id: string | null;
     }>;
-    if (data.court != null) {
-      list = list.filter((r) => (r.court_numbers ?? []).includes(data.court!));
-    }
     const uids = [...new Set(list.map((r) => r.user_id))];
     const nameByUser = new Map<string, string>();
     if (uids.length) {
@@ -166,7 +161,49 @@ export const getCourtBookingsForScheduleDay = createServerFn({ method: "POST" })
       ...r,
       short_name: nameByUser.get(r.user_id) ?? String(r.user_id).slice(0, 6) + "…",
     }));
-    return { rows: enriched, date: data.date };
+
+    // Overlaps dari baris hari yang sama (tanpa fetch kedua).
+    type Row = {
+      id: string;
+      booking_date: string;
+      start_time: string;
+      duration_hours: number;
+      court_numbers: number[];
+    };
+    const overlaps: { a: string; b: string; court: number; message: string }[] = [];
+    const byCourt = new Map<number, Row[]>();
+    list.forEach((r) => {
+      const courts = r.court_numbers?.length ? r.court_numbers : [1];
+      courts.forEach((c) => {
+        if (!byCourt.has(c)) byCourt.set(c, []);
+        byCourt.get(c)!.push(r);
+      });
+    });
+    byCourt.forEach((bookings, court) => {
+      const intervals = bookings.map((r) => {
+        const s = parseBookingStart(r.booking_date, r.start_time);
+        const e = s + Math.max(1, Number(r.duration_hours ?? 1)) * 3600000;
+        return { id: r.id, s, e };
+      });
+      intervals.sort((x, y) => x.s - y.s);
+      for (let i = 0; i < intervals.length; i++) {
+        for (let j = i + 1; j < intervals.length; j++) {
+          const A = intervals[i];
+          const B = intervals[j];
+          if (A.id === B.id) continue;
+          if (A.s < B.e && B.s < A.e) {
+            overlaps.push({
+              a: A.id,
+              b: B.id,
+              court,
+              message: `Court ${court}: booking ${A.id} overlap ${B.id}`,
+            });
+          }
+        }
+      }
+    });
+
+    return { rows: enriched, date: data.date, overlaps: overlaps.slice(0, 50) };
   });
 
 export const getProgramsDashboard = createServerFn({ method: "GET" })
@@ -184,13 +221,26 @@ export const getProgramsDashboard = createServerFn({ method: "GET" })
     const ids = (programs ?? []).map((p: { id: string }) => p.id);
     let counts = new Map<string, number>();
     if (ids.length) {
-      const { data: parts } = await supabaseAdmin
-        .from("program_participants")
-        .select("program_id")
-        .in("program_id", ids);
-      (parts ?? []).forEach((r: { program_id: string }) => {
-        counts.set(r.program_id, (counts.get(r.program_id) ?? 0) + 1);
-      });
+      const { data: stats, error: statsErr } = await supabaseAdmin.rpc(
+        "admin_program_participant_counts" as never,
+        { p_program_ids: ids } as never,
+      );
+      if (statsErr) {
+        const { data: parts } = await supabaseAdmin
+          .from("program_participants")
+          .select("program_id")
+          .in("program_id", ids);
+        (parts ?? []).forEach((r: { program_id: string }) => {
+          counts.set(r.program_id, (counts.get(r.program_id) ?? 0) + 1);
+        });
+      } else {
+        for (const row of (stats ?? []) as Array<{
+          program_id: string;
+          participant_count: number;
+        }>) {
+          counts.set(row.program_id, Number(row.participant_count ?? 0));
+        }
+      }
     }
 
     const active = (programs ?? []).filter(

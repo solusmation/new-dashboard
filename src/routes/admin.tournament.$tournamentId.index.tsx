@@ -30,17 +30,30 @@ import {
 
 } from "@/components/admin/tournament/TournamentBracketDialog";
 
-import { TournamentInfoTab } from "@/components/admin/tournament/TournamentInfoTab";
-
-import { TournamentScheduleTab } from "@/components/admin/tournament/TournamentScheduleTab";
-
-import { TournamentBracketTab } from "@/components/admin/tournament/TournamentBracketTab";
-
-import { TournamentStandingsTab } from "@/components/admin/tournament/TournamentStandingsTab";
-
 import { Button } from "@/components/ui/button";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const TournamentInfoTab = React.lazy(() =>
+  import("@/components/admin/tournament/TournamentInfoTab").then((m) => ({
+    default: m.TournamentInfoTab,
+  })),
+);
+const TournamentScheduleTab = React.lazy(() =>
+  import("@/components/admin/tournament/TournamentScheduleTab").then((m) => ({
+    default: m.TournamentScheduleTab,
+  })),
+);
+const TournamentBracketTab = React.lazy(() =>
+  import("@/components/admin/tournament/TournamentBracketTab").then((m) => ({
+    default: m.TournamentBracketTab,
+  })),
+);
+const TournamentStandingsTab = React.lazy(() =>
+  import("@/components/admin/tournament/TournamentStandingsTab").then((m) => ({
+    default: m.TournamentStandingsTab,
+  })),
+);
 
 
 
@@ -306,6 +319,11 @@ function TournamentDetailPage() {
 
 
 
+          <React.Suspense
+            fallback={
+              <div className="py-8 text-center text-sm text-muted-foreground">Memuat tab…</div>
+            }
+          >
           <Tabs
 
             value={activeTab}
@@ -503,6 +521,7 @@ function TournamentDetailPage() {
             </TabsContent>
 
           </Tabs>
+          </React.Suspense>
 
         </>
 

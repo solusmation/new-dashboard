@@ -1,14 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSuperadminAuth } from "@/lib/admin-superadmin-middleware";
+import { invalidateSuperadminCache, requireSuperadminAuth } from "@/lib/admin-superadmin-middleware";
 import {
-  assertSuperadmin,
   countSuperadmins,
   parseAdminRole,
   type AdminProfileRole,
 } from "@/lib/admin-superadmin-guard";
 import { fetchAuthMetaForUserIds } from "@/lib/auth-user-meta.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { MEMBERSHIP_TIERS, type MembershipTier } from "@/lib/membership-tier";
+
+export { MEMBERSHIP_TIERS, type MembershipTier };
 
 const adminRoleSchema = z.enum(["user", "admin", "superadmin"]);
 
@@ -70,18 +72,18 @@ export const getUsersOverview = createServerFn({ method: "POST" })
     }
 
     const [total, active7, active30, onboarded] = await Promise.all([
-      supabaseAdmin.from("profiles").select("*", { count: "exact", head: true }),
+      supabaseAdmin.from("profiles").select("user_id", { count: "exact", head: true }),
       supabaseAdmin
         .from("profiles")
-        .select("*", { count: "exact", head: true })
+        .select("user_id", { count: "exact", head: true })
         .gte("updated_at", d7),
       supabaseAdmin
         .from("profiles")
-        .select("*", { count: "exact", head: true })
+        .select("user_id", { count: "exact", head: true })
         .gte("updated_at", d30),
       supabaseAdmin
         .from("profiles")
-        .select("*", { count: "exact", head: true })
+        .select("user_id", { count: "exact", head: true })
         .eq("onboarded", true),
     ]);
 
@@ -268,7 +270,6 @@ export const updateProfileRole = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
     const role = parseAdminRole(data.role) as AdminProfileRole;
 
     const { data: target, error: fetchErr } = await supabaseAdmin
@@ -293,11 +294,10 @@ export const updateProfileRole = createServerFn({ method: "POST" })
       .eq("user_id", data.userId);
     if (error) throw new Error(error.message);
 
+    invalidateSuperadminCache(data.userId);
+
     return { ok: true, userId: data.userId, role };
   });
-
-export const MEMBERSHIP_TIERS = ["basic", "gold"] as const;
-export type MembershipTier = (typeof MEMBERSHIP_TIERS)[number];
 
 export const updateProfileMembership = createServerFn({ method: "POST" })
   .middleware([requireSuperadminAuth])
@@ -310,8 +310,6 @@ export const updateProfileMembership = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
-
     const { data: target, error: fetchErr } = await supabaseAdmin
       .from("profiles")
       .select("user_id, membership_tier")
@@ -342,11 +340,46 @@ export const updateProfileMembership = createServerFn({ method: "POST" })
     return { ok: true, userId: data.userId, membershipTier: data.membershipTier };
   });
 
+export const adjustUserCoins = createServerFn({ method: "POST" })
+  .middleware([requireSuperadminAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        userId: z.string().uuid(),
+        /** Positive = tambah, negative = kurangi. */
+        delta: z
+          .number()
+          .int()
+          .min(-1_000_000)
+          .max(1_000_000)
+          .refine((n) => n !== 0, "Delta tidak boleh 0"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const { data: result, error } = await supabaseAdmin.rpc(
+      "admin_adjust_user_coins" as never,
+      {
+        p_user_id: data.userId,
+        p_delta: data.delta,
+      } as never,
+    );
+
+    if (error) throw new Error(error.message);
+
+    const row = (result ?? {}) as { coins?: number; lifetime_coins?: number; delta?: number };
+    return {
+      ok: true as const,
+      userId: data.userId,
+      coins: Number(row.coins ?? 0),
+      lifetimeCoins: Number(row.lifetime_coins ?? 0),
+      delta: data.delta,
+    };
+  });
+
 export const getUsersEligibleForInstructor = createServerFn({ method: "GET" })
   .middleware([requireSuperadminAuth])
   .handler(async ({ context }) => {
-    await assertSuperadmin(context.userId);
-
     const [{ data: instructors, error: iErr }, { data: profiles, error: pErr }] = await Promise.all([
       supabaseAdmin.from("coaches").select("user_id"),
       supabaseAdmin
@@ -376,8 +409,6 @@ export const promoteUserToInstructor = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
-
     const { data: existing } = await supabaseAdmin
       .from("coaches")
       .select("id")
@@ -426,8 +457,6 @@ export const revokeInstructorEligibility = createServerFn({ method: "POST" })
   .middleware([requireSuperadminAuth])
   .inputValidator((input) => z.object({ userId: z.string().uuid() }).parse(input))
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
-
     const { data: row, error: findErr } = await supabaseAdmin
       .from("coaches")
       .select("id")

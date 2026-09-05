@@ -4,9 +4,6 @@ import viteReact from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, mergeConfig, type UserConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 
-// Konfigurasi setara dengan @lovable.dev/vite-tanstack-config (index.js),
-// tanpa paket itu — entry "main"-nya adalah .cjs yang require() ke lovable-tagger (ESM) dan gagal di Node lokal.
-
 const tanstackStartDefaults = {
   importProtection: {
     behavior: "error" as const,
@@ -25,6 +22,9 @@ export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
     tanstackStart(
       mergeConfig(tanstackStartDefaults, {
         server: { entry: "server" },
+        router: {
+          autoCodeSplitting: true,
+        },
       }),
     ),
     viteReact(),
@@ -47,7 +47,7 @@ export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
         }),
       );
     } catch {
-      /* opsional seperti di wrapper Lovable */
+      /* Cloudflare plugin opsional */
     }
   }
 
@@ -72,6 +72,16 @@ export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
 
   let config: UserConfig = {
     define: { ...envDefine, ...supabaseDefine },
+    optimizeDeps: {
+      include: [
+        "recharts",
+        "@supabase/supabase-js",
+        "react-markdown",
+        "remark-gfm",
+        "react-image-crop",
+        "date-fns",
+      ],
+    },
     resolve: {
       alias: {
         "@": `${process.cwd()}/src`,
@@ -98,7 +108,7 @@ export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
   };
 
   // Abaikan artefak build/cache — terutama `.netlify` (ribuan file) agar `vite dev` tidak
-  // macet menit-an di Windows. awaitWriteFinish (dulu untuk Lovable) juga memperlambat cold start.
+  // macet menit-an di Windows.
   config = mergeConfig(config, {
     server: {
       watch: {
@@ -106,7 +116,6 @@ export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
           "**/node_modules/**",
           "**/dist/**",
           "**/.netlify/**",
-          "**/.lovable/**",
           "**/.git/**",
           "**/.wrangler/**",
           "**/.tanstack/**",

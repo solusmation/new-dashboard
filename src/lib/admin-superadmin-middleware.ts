@@ -9,20 +9,41 @@ export type AdminAuthContext = {
   isSuperadmin: true;
 };
 
+const SUPERADMIN_CACHE_TTL_MS = 45_000;
+const superadminCache = new Map<string, { value: boolean; expiresAt: number }>();
+
 export async function userIsSuperadmin(userId: string): Promise<boolean> {
+  const now = Date.now();
+  const cached = superadminCache.get(userId);
+  if (cached && cached.expiresAt > now) return cached.value;
+
   const { data: isSuper, error: rpcErr } = await supabaseAdmin.rpc("is_superadmin", {
     p_uid: userId,
   });
-  if (!rpcErr && isSuper === true) return true;
+  let allowed = !rpcErr && isSuper === true;
 
-  const { data: profile, error: profileErr } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (profileErr) throw new Error(profileErr.message);
-  return profile?.role === "superadmin";
+  if (!allowed) {
+    const { data: profile, error: profileErr } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (profileErr) throw new Error(profileErr.message);
+    allowed = profile?.role === "superadmin";
+  }
+
+  superadminCache.set(userId, { value: allowed, expiresAt: now + SUPERADMIN_CACHE_TTL_MS });
+  return allowed;
 }
+
+/** Invalidate role cache after role changes (promote/demote superadmin). */
+export function invalidateSuperadminCache(userId?: string) {
+  if (userId) superadminCache.delete(userId);
+  else superadminCache.clear();
+}
+
+const JWT_USER_CACHE_TTL_MS = 30_000;
+const jwtUserCache = new Map<string, { userId: string; expiresAt: number }>();
 
 async function resolveUserIdFromBearer(): Promise<string> {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -46,7 +67,10 @@ async function resolveUserIdFromBearer(): Promise<string> {
   const token = authHeader.slice("Bearer ".length).trim();
   if (!token) throw new Error("Unauthorized: token kosong.");
 
-  // getUser(jwt) — kompatibel dengan semua tipe JWT proyek (getClaims sering gagal di HS256 lama).
+  const now = Date.now();
+  const cached = jwtUserCache.get(token);
+  if (cached && cached.expiresAt > now) return cached.userId;
+
   const authClient = createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -54,6 +78,13 @@ async function resolveUserIdFromBearer(): Promise<string> {
   const { data, error } = await authClient.auth.getUser(token);
   if (error || !data.user?.id) {
     throw new Error(error?.message ?? "Unauthorized: token tidak valid.");
+  }
+
+  jwtUserCache.set(token, { userId: data.user.id, expiresAt: now + JWT_USER_CACHE_TTL_MS });
+  // Bound cache size (simple eviction of oldest-ish entries)
+  if (jwtUserCache.size > 200) {
+    const first = jwtUserCache.keys().next().value;
+    if (first) jwtUserCache.delete(first);
   }
 
   return data.user.id;

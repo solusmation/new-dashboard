@@ -123,18 +123,35 @@ export const listVouchers = createServerFn({ method: "GET" })
     const ids = (vouchers ?? []).map((v) => v.id);
     const counts = new Map<string, { issued: number; used: number }>();
     if (ids.length > 0) {
-      const { data: codes, error: codesErr } = await supabaseAdmin
-        .from("voucher_codes")
-        .select("voucher_id, used_at")
-        .in("voucher_id", ids);
-      if (codesErr) throw new Error(codesErr.message);
-      for (const row of codes ?? []) {
-        const cur = counts.get(row.voucher_id) ?? { issued: 0, used: 0 };
-        cur.issued += 1;
-        if (row.used_at) cur.used += 1;
-        counts.set(row.voucher_id, cur);
+      const { data: stats, error: codesErr } = await supabaseAdmin.rpc(
+        "admin_voucher_code_stats" as never,
+        { p_voucher_ids: ids } as never,
+      );
+      if (codesErr) {
+        // Fallback: narrow select if RPC belum ter-deploy
+        const { data: codes, error: fallbackErr } = await supabaseAdmin
+          .from("voucher_codes")
+          .select("voucher_id, used_at")
+          .in("voucher_id", ids);
+        if (fallbackErr) throw new Error(fallbackErr.message);
+        for (const row of codes ?? []) {
+          const cur = counts.get(row.voucher_id) ?? { issued: 0, used: 0 };
+          cur.issued += 1;
+          if (row.used_at) cur.used += 1;
+          counts.set(row.voucher_id, cur);
+        }
+      } else {
+        for (const row of (stats ?? []) as Array<{
+          voucher_id: string;
+          issued: number;
+          used: number;
+        }>) {
+          counts.set(row.voucher_id, {
+            issued: Number(row.issued ?? 0),
+            used: Number(row.used ?? 0),
+          });
+        }
       }
-
     }
 
     const now = new Date();

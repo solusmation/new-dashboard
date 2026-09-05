@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UserAdminControls } from "@/components/admin/UserAdminControls";
+import { membershipTierLabel } from "@/lib/membership-tier";
 
 export const Route = createFileRoute("/admin/pengguna/$userId")({
   component: PenggunaDetailPage,
@@ -67,7 +68,7 @@ function PenggunaDetailPage() {
               <div className="flex flex-wrap gap-2 mt-2">
                 <Badge>Rank: {String(p.rank ?? "—")}</Badge>
                 <Badge variant={p.membership_tier === "gold" ? "default" : "secondary"}>
-                  Membership: {p.membership_tier === "gold" ? "Gold" : "Basic"}
+                  Membership: {membershipTierLabel(String(p.membership_tier))}
                 </Badge>
                 <Badge variant="secondary">Role: {String(p.role)}</Badge>
                 {data?.isInstructor ? <Badge variant="default">Coach</Badge> : null}
@@ -83,6 +84,7 @@ function PenggunaDetailPage() {
             userId={userId}
             currentRole={String(p.role ?? "user")}
             currentMembership={String(p.membership_tier ?? "basic")}
+            currentCoins={Number(p.coins ?? 0)}
             isInstructor={Boolean(data?.isInstructor)}
           />
 

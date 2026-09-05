@@ -211,7 +211,10 @@ export function VoucherFormDialog({ open, onOpenChange, voucher }: Props) {
     onSuccess: () => {
       toast.success("Voucher berhasil diperbarui.");
       onOpenChange(false);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher", "list"] });
+      if (voucher?.id) {
+        void queryClient.invalidateQueries({ queryKey: ["admin", "voucher", "detail", voucher.id] });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });

@@ -83,7 +83,8 @@ export function VoucherAddRecipientsDialog({
           : "Tidak ada pengguna baru yang ditambahkan.",
       );
       onOpenChange(false);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher", "detail", voucherId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

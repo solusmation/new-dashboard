@@ -46,9 +46,6 @@ export function TournamentBracketDialog({
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["admin", "tournament", tournamentId] });
-    void queryClient.invalidateQueries({
-      queryKey: ["admin", "tournament", tournamentId, "schedule"],
-    });
   };
 
   const genBracketFn = useServerFn(generateTournamentBracket);

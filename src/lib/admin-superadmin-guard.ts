@@ -1,3 +1,4 @@
+import { userIsSuperadmin } from "@/lib/admin-superadmin-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const ADMIN_ROLES = ["user", "admin", "superadmin"] as const;
@@ -9,22 +10,10 @@ export function parseAdminRole(role: string): AdminProfileRole {
   throw new Error(`Role tidak valid. Gunakan: ${ADMIN_ROLES.join(", ")}`);
 }
 
-async function userIsSuperadmin(userId: string): Promise<boolean> {
-  const { data: isSuper, error: rpcErr } = await supabaseAdmin.rpc("is_superadmin", {
-    p_uid: userId,
-  });
-  if (!rpcErr && isSuper === true) return true;
-
-  const { data: profile, error: profileErr } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (profileErr) throw new Error(profileErr.message);
-  return profile?.role === "superadmin";
-}
-
-/** Verifikasi aksi hanya untuk superadmin (dari sesi login). */
+/**
+ * Verifikasi superadmin untuk path tanpa middleware.
+ * Handler yang sudah memakai `requireSuperadminAuth` tidak perlu memanggil ini lagi.
+ */
 export async function assertSuperadmin(actorUserId?: string): Promise<void> {
   if (actorUserId) {
     const allowed = await userIsSuperadmin(actorUserId);
@@ -45,7 +34,7 @@ export async function assertSuperadmin(actorUserId?: string): Promise<void> {
 export async function countSuperadmins(): Promise<number> {
   const { count, error } = await supabaseAdmin
     .from("profiles")
-    .select("*", { count: "exact", head: true })
+    .select("user_id", { count: "exact", head: true })
     .eq("role", "superadmin");
   if (error) throw new Error(error.message);
   return count ?? 0;

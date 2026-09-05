@@ -153,21 +153,72 @@ async function probeFinanceTxnTable(
   return { exists: true, count: count ?? 0 };
 }
 
-/** Skema Padels Anda memakai tabel publik `transaksi`; env Lovable bisa punya `transactions` atau `payment_ledger`. */
+/** Skema Padels memakai tabel publik `transaksi`; beberapa env legacy bisa punya `transactions` atau `payment_ledger`. */
+const TXN_SOURCE_CACHE_TTL_MS = 5 * 60_000;
+let txnSourceCache: { value: FinanceTxnTable; expiresAt: number } | null = null;
+
 async function resolveFinanceTxnSource(): Promise<FinanceTxnTable> {
-  const tTrx = await probeFinanceTxnTable("transaksi");
-  const tEn = await probeFinanceTxnTable("transactions");
-  const pl = await probeFinanceTxnTable("payment_ledger");
+  const now = Date.now();
+  if (txnSourceCache && txnSourceCache.expiresAt > now) return txnSourceCache.value;
 
-  if (tTrx.exists && tTrx.count > 0) return "transaksi";
-  if (tEn.exists && tEn.count > 0) return "transactions";
-  if (pl.exists && pl.count > 0) return "payment_ledger";
+  const [tTrx, tEn, pl] = await Promise.all([
+    probeFinanceTxnTable("transaksi"),
+    probeFinanceTxnTable("transactions"),
+    probeFinanceTxnTable("payment_ledger"),
+  ]);
 
-  if (tTrx.exists) return "transaksi";
-  if (tEn.exists) return "transactions";
-  if (pl.exists) return "payment_ledger";
+  let value: FinanceTxnTable = "transaksi";
+  if (tTrx.exists && tTrx.count > 0) value = "transaksi";
+  else if (tEn.exists && tEn.count > 0) value = "transactions";
+  else if (pl.exists && pl.count > 0) value = "payment_ledger";
+  else if (tTrx.exists) value = "transaksi";
+  else if (tEn.exists) value = "transactions";
+  else if (pl.exists) value = "payment_ledger";
 
-  return "transaksi";
+  txnSourceCache = { value, expiresAt: now + TXN_SOURCE_CACHE_TTL_MS };
+  return value;
+}
+
+/** Kolom sempit untuk mapping TxRow / list (hindari select *). */
+const TRANSAKSI_TX_COLS =
+  "id, amount_idr, status, created_at, kategori, reference_id, reference_type, court_booking_id, booking_id, metadata, program_id, match_id";
+
+type StatusSums = { success: number; pending: number; refund: number };
+
+async function sumTransaksiByStatusRpc(range?: CreatedRange): Promise<StatusSums | null> {
+  try {
+    const { data, error } = await supabaseAdmin.rpc("admin_sum_transaksi_by_status" as never, {
+      p_from: range?.createdFrom ?? null,
+      p_to: range?.createdTo ?? null,
+      p_to_exclusive: range?.createdToExclusive ?? null,
+    } as never);
+    if (error) return null;
+    const row = data as StatusSums | null;
+    if (!row || typeof row !== "object") return null;
+    return {
+      success: Number(row.success ?? 0),
+      pending: Number(row.pending ?? 0),
+      refund: Number(row.refund ?? 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function sumFinanceAmounts(
+  range: CreatedRange | undefined,
+  source: FinanceTxnTable,
+): Promise<StatusSums> {
+  if (source === "transaksi") {
+    const viaRpc = await sumTransaksiByStatusRpc(range);
+    if (viaRpc) return viaRpc;
+  }
+  const rows = await fetchFinanceTxRows(range, source);
+  return {
+    success: sumTxByNormStatus(rows, "success"),
+    pending: sumTxByNormStatus(rows, "pending"),
+    refund: sumTxByNormStatus(rows, "refund"),
+  };
 }
 
 async function fetchTransactionEnglishRows(range?: CreatedRange): Promise<TxRow[]> {
@@ -213,7 +264,7 @@ async function fetchTransaksiMappedRows(range?: CreatedRange): Promise<TxRow[]> 
   const rows = await fetchPaginated<TransaksiDbRow>(TX_PAGE, TX_MAX_PAGES, (from, to) => {
     let q = supabaseAdmin
       .from("transaksi")
-      .select("*")
+      .select(TRANSAKSI_TX_COLS)
       .order("created_at", { ascending: true })
       .range(from, to);
     if (range?.createdFrom) q = q.gte("created_at", range.createdFrom);
@@ -551,7 +602,7 @@ async function fetchFinanceTransactionsPage(
   if (source === "transaksi") {
     let q = supabaseAdmin
       .from("transaksi")
-      .select("*")
+      .select(TRANSAKSI_TX_COLS)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(limit);
@@ -769,13 +820,15 @@ export const getFinanceOverview = createServerFn({ method: "GET" })
 
     const txnSource = await resolveFinanceTxnSource();
 
-    const [txAll, tx7, tx30, txPrev30, tx30Rows] = await Promise.all([
-      fetchFinanceTxRows(undefined, txnSource),
-      fetchFinanceTxRows({ createdFrom: d7, createdTo: endIso }, txnSource),
-      fetchFinanceTxRows({ createdFrom: d30, createdTo: endIso }, txnSource),
-      fetchFinanceTxRows({ createdFrom: d60, createdToExclusive: d30 }, txnSource),
-      fetchFinanceTxRows({ createdFrom: d30, createdTo: endIso }, txnSource),
+    const [txAll, tx7, tx30, txPrev30] = await Promise.all([
+      sumFinanceAmounts(undefined, txnSource),
+      sumFinanceAmounts({ createdFrom: d7, createdTo: endIso }, txnSource),
+      sumFinanceAmounts({ createdFrom: d30, createdTo: endIso }, txnSource),
+      sumFinanceAmounts({ createdFrom: d60, createdToExclusive: d30 }, txnSource),
     ]);
+
+    // Trend & byKind butuh baris 30 hari (kolom sempit); sekali saja.
+    const tx30Rows = await fetchFinanceTxRows({ createdFrom: d30, createdTo: endIso }, txnSource);
 
     const kindMap = new Map<string, number>();
     tx30Rows.forEach((r) => {
@@ -799,15 +852,15 @@ export const getFinanceOverview = createServerFn({ method: "GET" })
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, amount]) => ({ date, amount }));
 
-    const last30Success = sumTxByNormStatus(tx30, "success");
-    const prev30Success = sumTxByNormStatus(txPrev30, "success");
+    const last30Success = tx30.success;
+    const prev30Success = txPrev30.success;
     const delta30 = prev30Success ? ((last30Success - prev30Success) / prev30Success) * 100 : null;
 
     return {
       dataSource: txnSource,
       totals: {
-        allTime: sumTxByNormStatus(txAll, "success"),
-        last7: sumTxByNormStatus(tx7, "success"),
+        allTime: txAll.success,
+        last7: tx7.success,
         last30: last30Success,
         delta30,
       },
@@ -909,19 +962,16 @@ export async function fetchFinanceLandingData() {
 
     const txnSource = await resolveFinanceTxnSource();
 
-    const [txAll, resCur, resPrev] = await Promise.all([
-      fetchFinanceTxRows(undefined, txnSource),
+    const [sumsAll, resCur, resPrev, sumsCur, sumsPrevM] = await Promise.all([
+      sumFinanceAmounts(undefined, txnSource),
       countCourtBookingsBetween(curMonthStart, endIso),
       countCourtBookingsBetween(prevMonthStart, prevMonthEnd),
+      sumFinanceAmounts({ createdFrom: curMonthStart, createdTo: endIso }, txnSource),
+      sumFinanceAmounts({ createdFrom: prevMonthStart, createdTo: prevMonthEnd }, txnSource),
     ]);
 
-    const [txCur, txPrevM] = await Promise.all([
-      fetchFinanceTxRows({ createdFrom: curMonthStart, createdTo: endIso }, txnSource),
-      fetchFinanceTxRows({ createdFrom: prevMonthStart, createdTo: prevMonthEnd }, txnSource),
-    ]);
-
-    const revenueThis = sumTxByNormStatus(txCur, "success");
-    const revenuePrev = sumTxByNormStatus(txPrevM, "success");
+    const revenueThis = sumsCur.success;
+    const revenuePrev = sumsPrevM.success;
     const revenueMonthDeltaPct = revenuePrev
       ? ((revenueThis - revenuePrev) / revenuePrev) * 100
       : null;
@@ -938,14 +988,14 @@ export async function fetchFinanceLandingData() {
         const key = `${ym.y}-${String(ym.m0 + 1).padStart(2, "0")}`;
         const mStart = jakartaMonthStartIso(ym.y, ym.m0);
         const mEnd = ym.y === cy && ym.m0 === cm ? endIso : jakartaMonthEndIso(ym.y, ym.m0);
-        const [txM, bookingsN] = await Promise.all([
-          fetchFinanceTxRows({ createdFrom: mStart, createdTo: mEnd }, txnSource),
+        const [sumsM, bookingsN] = await Promise.all([
+          sumFinanceAmounts({ createdFrom: mStart, createdTo: mEnd }, txnSource),
           countCourtBookingsBetween(mStart, mEnd),
         ]);
         return {
           key,
           label: monthLabelJakarta(ym.y, ym.m0),
-          revenue: sumTxByNormStatus(txM, "success"),
+          revenue: sumsM.success,
           bookings: bookingsN,
         };
       }),
@@ -953,7 +1003,7 @@ export async function fetchFinanceLandingData() {
 
     return {
       dataSource: txnSource,
-      totals: { allTime: sumTxByNormStatus(txAll, "success") },
+      totals: { allTime: sumsAll.success },
       calendarMonth: {
         revenue: revenueThis,
         revenueDeltaPct: revenueMonthDeltaPct,

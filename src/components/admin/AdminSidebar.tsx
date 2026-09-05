@@ -12,6 +12,7 @@ import {
   Trophy,
   UtensilsCrossed,
   Ticket,
+  Star,
   Bell,
   Settings,
   LogOut,
@@ -43,6 +44,7 @@ const groups: ReadonlyArray<{
       { to: "/admin/keuangan", label: "Keuangan", icon: LayoutGrid },
       { to: "/admin/fnb", label: "FnB", icon: UtensilsCrossed },
       { to: "/admin/voucher", label: "Voucher", icon: Ticket },
+      { to: "/admin/redeem", label: "Tukar Star", icon: Star },
       { to: "/admin/coach", label: "Coach", icon: GraduationCap },
       { to: "/admin/pengguna", label: "Pengguna", icon: Users },
       {

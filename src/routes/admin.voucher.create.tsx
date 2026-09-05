@@ -123,7 +123,7 @@ function VoucherCreatePage() {
     },
     onSuccess: (res) => {
       toast.success("Voucher berhasil dibuat.");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher", "list"] });
       void navigate({ to: "/admin/voucher/$voucherId", params: { voucherId: res.id } });
     },
     onError: (e: Error) => toast.error(e.message),

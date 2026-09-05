@@ -72,7 +72,8 @@ function RedeemCodeCell({
     onSuccess: () => {
       setCode("");
       toast.success("Kode benar. Voucher ditandai sudah digunakan.");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher", "detail", voucherId] });
     },
     onError: (e: Error) => {
       toast.error(e.message);
@@ -137,15 +138,13 @@ function VoucherDetailPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "voucher", "detail", voucherId],
     queryFn: () => fetchDetail({ data: { voucherId } }),
-    refetchOnWindowFocus: true,
-    refetchInterval: 15_000,
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteFn({ data: { voucherId } }),
     onSuccess: (res) => {
       toast.success(`Voucher "${res.name}" berhasil dihapus.`);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher", "list"] });
       void navigate({ to: "/admin/voucher" });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -159,7 +158,8 @@ function VoucherDetailPage() {
           ? `Semua pengguna ditambahkan (${res.issued} kode baru).`
           : "Semua pengguna sudah memiliki kode.",
       );
-      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "voucher", "detail", voucherId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

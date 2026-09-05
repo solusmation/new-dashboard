@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { GraduationCap, LayoutGrid, Trash2 } from "lucide-react";
+import { GraduationCap, Trash2 } from "lucide-react";
 import { getInstructorsDashboard } from "@/lib/admin-data.functions";
 import { deleteCoachById } from "@/lib/admin-coach.functions";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ const fmtIDR = (n: number) =>
   }).format(n);
 
 function CoachAdminPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fetchCoaches = useServerFn(getInstructorsDashboard);
   const deleteFn = useServerFn(deleteCoachById);
@@ -35,8 +36,7 @@ function CoachAdminPage() {
     onSuccess: (res) => {
       toast.success(`Coach ${res.displayName} berhasil dihapus.`);
       void queryClient.invalidateQueries({ queryKey: ["admin", "coaches"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "instructors"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "users", "list"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -82,51 +82,71 @@ function CoachAdminPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r: Record<string, unknown>) => (
-              <tr key={String(r.id)} className="border-t">
-                <td className="px-4 py-3 font-medium">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={typeof r.avatar_url === "string" ? r.avatar_url : undefined} />
-                      <AvatarFallback>
-                        {String(r.display_name ?? "C").slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span>{String(r.display_name)}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="tabular-nums">{fmtIDR(Number(r.hourly_rate_idr))}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {r.court_fee_included ? "Termasuk Court" : "Tidak Termasuk Court"}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  {Number(r.avg_rating).toFixed(1)} ({String(r.total_raters)})
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <Button asChild variant="outline" size="sm">
-                      <Link to="/admin/coach/$coachId/hub" params={{ coachId: String(r.id) }}>
-                        <LayoutGrid className="h-4 w-4 mr-1.5" />
-                        Coach Hub
-                      </Link>
-                    </Button>
+            {rows.map((r: Record<string, unknown>) => {
+              const coachId = String(r.id);
+              return (
+                <tr
+                  key={coachId}
+                  role="link"
+                  tabIndex={0}
+                  className="border-t cursor-pointer transition-colors hover:bg-muted/40"
+                  onClick={() =>
+                    void navigate({
+                      to: "/admin/coach/$coachId/hub",
+                      params: { coachId },
+                    })
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      void navigate({
+                        to: "/admin/coach/$coachId/hub",
+                        params: { coachId },
+                      });
+                    }
+                  }}
+                >
+                  <td className="px-4 py-3 font-medium">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9">
+                        <AvatarImage
+                          src={typeof r.avatar_url === "string" ? r.avatar_url : undefined}
+                        />
+                        <AvatarFallback>
+                          {String(r.display_name ?? "C").slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span>{String(r.display_name)}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="tabular-nums">{fmtIDR(Number(r.hourly_rate_idr))}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {r.court_fee_included ? "Termasuk Court" : "Tidak Termasuk Court"}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {Number(r.avg_rating).toFixed(1)} ({String(r.total_raters)})
+                  </td>
+                  <td className="px-4 py-3 text-right">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       className="text-destructive hover:text-destructive"
                       disabled={deleteMutation.isPending}
-                      onClick={() => handleDelete(String(r.id), String(r.display_name))}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(coachId, String(r.display_name));
+                      }}
                     >
                       <Trash2 className="h-4 w-4 mr-1.5" />
                       Hapus
                     </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              );
+            })}
             {!isLoading && rows.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">

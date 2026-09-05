@@ -24,7 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getUsersOverview, MEMBERSHIP_TIERS, updateProfileMembership } from "@/lib/admin-users.functions";
+import { adjustUserCoins, getUsersOverview, MEMBERSHIP_TIERS, updateProfileMembership } from "@/lib/admin-users.functions";
+import { membershipTierLabel, normalizeMembershipTier } from "@/lib/membership-tier";
 import { APP_RANK_VALUES, appRankLabel } from "@/lib/app-rank";
 import { GoldMemberPromoPanel } from "@/components/admin/GoldMemberPromoPanel";
 
@@ -37,16 +38,22 @@ const RANKS = APP_RANK_VALUES;
 function PenggunaPage() {
   const fetchUsers = useServerFn(getUsersOverview);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [role, setRole] = useState<string>("all");
   const [rank, setRank] = useState<string>("all");
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
 
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
   const { data, isLoading } = useQuery({
-    queryKey: ["admin", "users", search, role, rank],
+    queryKey: ["admin", "users", "list", debouncedSearch, role, rank],
     queryFn: () =>
       fetchUsers({
         data: {
-          search: search || undefined,
+          search: debouncedSearch || undefined,
           role: role === "all" ? undefined : role,
           rank: rank === "all" ? undefined : rank,
         },
@@ -145,7 +152,7 @@ function PenggunaPage() {
                   </td>
                   <td className="px-5 py-3">
                     <Badge variant={u.membership_tier === "gold" ? "default" : "secondary"}>
-                      {u.membership_tier === "gold" ? "Gold" : "Basic"}
+                      {membershipTierLabel(u.membership_tier)}
                     </Badge>
                   </td>
                   <td className="px-5 py-3">
@@ -180,6 +187,9 @@ function PenggunaPage() {
                   onMembershipSaved={(tier) =>
                     setSelectedUser((prev) => (prev ? { ...prev, membership_tier: tier } : prev))
                   }
+                  onCoinsSaved={(coins) =>
+                    setSelectedUser((prev) => (prev ? { ...prev, coins } : prev))
+                  }
                 />
               </div>
             </>
@@ -195,18 +205,26 @@ type UserRow = NonNullable<Awaited<ReturnType<typeof getUsersOverview>>["users"]
 function UserDetailCard({
   user: u,
   onMembershipSaved,
+  onCoinsSaved,
 }: {
   user: UserRow;
   onMembershipSaved: (tier: (typeof MEMBERSHIP_TIERS)[number]) => void;
+  onCoinsSaved: (coins: number) => void;
 }) {
   const queryClient = useQueryClient();
   const updateMembershipFn = useServerFn(updateProfileMembership);
-  const currentTier = u.membership_tier === "gold" ? "gold" : "basic";
+  const adjustCoinsFn = useServerFn(adjustUserCoins);
+  const currentTier = normalizeMembershipTier(u.membership_tier);
   const [membership, setMembership] = useState(currentTier);
+  const [coins, setCoins] = useState(String(u.coins));
 
   useEffect(() => {
     setMembership(currentTier);
   }, [u.user_id, currentTier]);
+
+  useEffect(() => {
+    setCoins(String(u.coins));
+  }, [u.user_id, u.coins]);
 
   const membershipMutation = useMutation({
     mutationFn: () =>
@@ -216,12 +234,39 @@ function UserDetailCard({
     onSuccess: (res) => {
       toast.success("Membership pengguna diperbarui.");
       onMembershipSaved(res.membershipTier);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "users", "list"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "user", u.user_id] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "gold-benefits", u.user_id] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const coinsMutation = useMutation({
+    mutationFn: (delta: number) => adjustCoinsFn({ data: { userId: u.user_id, delta } }),
+    onSuccess: (res) => {
+      toast.success(`Coins diperbarui menjadi ${res.coins.toLocaleString("id-ID")}.`);
+      onCoinsSaved(res.coins);
+      setCoins(String(res.coins));
+      void queryClient.invalidateQueries({ queryKey: ["admin", "users", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "user", u.user_id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const parsedCoins = parseInt(coins.replace(/\D/g, ""), 10);
+  const coinsDirty =
+    Number.isFinite(parsedCoins) && parsedCoins >= 0 && parsedCoins !== u.coins;
+  const busy = membershipMutation.isPending || coinsMutation.isPending;
+
+  const saveCoins = () => {
+    if (!Number.isFinite(parsedCoins) || parsedCoins < 0) {
+      toast.error("Coins harus angka >= 0.");
+      return;
+    }
+    const delta = parsedCoins - u.coins;
+    if (delta === 0) return;
+    coinsMutation.mutate(delta);
+  };
 
   return (
     <div className="space-y-3">
@@ -241,7 +286,29 @@ function UserDetailCard({
         <DetailItem label="Role" value={u.role} />
         <DetailItem label="Rank" value={appRankLabel(u.rank)} />
         <DetailItem label="Total Score" value={String(u.total_score ?? 0)} />
-        <DetailItem label="Coins" value={u.coins.toLocaleString("id-ID")} />
+        <div>
+          <span className="text-xs text-muted-foreground">Coins</span>
+          <div className="mt-1 flex items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              step={1}
+              className="h-8 font-medium"
+              value={coins}
+              onChange={(e) => setCoins(e.target.value)}
+              disabled={busy}
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="shrink-0"
+              disabled={busy || !coinsDirty}
+              onClick={saveCoins}
+            >
+              Simpan
+            </Button>
+          </div>
+        </div>
         <DetailItem label="Last Active" value={u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString("id-ID") : "—"} />
         <DetailItem label="Coach" value={u.isInstructor ? "Ya" : "Tidak"} />
       </div>
@@ -251,8 +318,8 @@ function UserDetailCard({
         <div className="flex items-end gap-2">
           <Select
             value={membership}
-            onValueChange={(v) => setMembership(v === "gold" ? "gold" : "basic")}
-            disabled={membershipMutation.isPending}
+            onValueChange={(v) => setMembership(normalizeMembershipTier(v))}
+            disabled={busy}
           >
             <SelectTrigger id="dialog-membership" className="flex-1">
               <SelectValue />
@@ -260,7 +327,7 @@ function UserDetailCard({
             <SelectContent>
               {MEMBERSHIP_TIERS.map((tier) => (
                 <SelectItem key={tier} value={tier}>
-                  {tier === "gold" ? "Gold" : "Basic"}
+                  {membershipTierLabel(tier)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -268,7 +335,7 @@ function UserDetailCard({
           <Button
             type="button"
             size="sm"
-            disabled={membershipMutation.isPending || membership === currentTier}
+            disabled={busy || membership === currentTier}
             onClick={() => membershipMutation.mutate()}
           >
             Simpan

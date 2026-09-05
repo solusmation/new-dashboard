@@ -16,6 +16,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminVoucherRouteImport } from './routes/admin.voucher'
 import { Route as AdminTournamentRouteImport } from './routes/admin.tournament'
 import { Route as AdminReservasiRouteImport } from './routes/admin.reservasi'
+import { Route as AdminRedeemRouteImport } from './routes/admin.redeem'
 import { Route as AdminProgramRouteImport } from './routes/admin.program'
 import { Route as AdminPenggunaRouteImport } from './routes/admin.pengguna'
 import { Route as AdminPengaturanRouteImport } from './routes/admin.pengaturan'
@@ -81,6 +82,11 @@ const AdminTournamentRoute = AdminTournamentRouteImport.update({
 const AdminReservasiRoute = AdminReservasiRouteImport.update({
   id: '/reservasi',
   path: '/reservasi',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRedeemRoute = AdminRedeemRouteImport.update({
+  id: '/redeem',
+  path: '/redeem',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminProgramRoute = AdminProgramRouteImport.update({
@@ -256,6 +262,7 @@ export interface FileRoutesByFullPath {
   '/admin/pengaturan': typeof AdminPengaturanRoute
   '/admin/pengguna': typeof AdminPenggunaRouteWithChildren
   '/admin/program': typeof AdminProgramRoute
+  '/admin/redeem': typeof AdminRedeemRoute
   '/admin/reservasi': typeof AdminReservasiRouteWithChildren
   '/admin/tournament': typeof AdminTournamentRouteWithChildren
   '/admin/voucher': typeof AdminVoucherRouteWithChildren
@@ -292,6 +299,7 @@ export interface FileRoutesByTo {
   '/admin/pengaturan': typeof AdminPengaturanRoute
   '/admin/pengguna': typeof AdminPenggunaRouteWithChildren
   '/admin/program': typeof AdminProgramRoute
+  '/admin/redeem': typeof AdminRedeemRoute
   '/admin': typeof AdminIndexRoute
   '/admin/fnb/transaksi': typeof AdminFnbTransaksiRoute
   '/admin/keuangan/okupansi': typeof AdminKeuanganOkupansiRoute
@@ -329,6 +337,7 @@ export interface FileRoutesById {
   '/admin/pengaturan': typeof AdminPengaturanRoute
   '/admin/pengguna': typeof AdminPenggunaRouteWithChildren
   '/admin/program': typeof AdminProgramRoute
+  '/admin/redeem': typeof AdminRedeemRoute
   '/admin/reservasi': typeof AdminReservasiRouteWithChildren
   '/admin/tournament': typeof AdminTournamentRouteWithChildren
   '/admin/voucher': typeof AdminVoucherRouteWithChildren
@@ -371,6 +380,7 @@ export interface FileRouteTypes {
     | '/admin/pengaturan'
     | '/admin/pengguna'
     | '/admin/program'
+    | '/admin/redeem'
     | '/admin/reservasi'
     | '/admin/tournament'
     | '/admin/voucher'
@@ -407,6 +417,7 @@ export interface FileRouteTypes {
     | '/admin/pengaturan'
     | '/admin/pengguna'
     | '/admin/program'
+    | '/admin/redeem'
     | '/admin'
     | '/admin/fnb/transaksi'
     | '/admin/keuangan/okupansi'
@@ -443,6 +454,7 @@ export interface FileRouteTypes {
     | '/admin/pengaturan'
     | '/admin/pengguna'
     | '/admin/program'
+    | '/admin/redeem'
     | '/admin/reservasi'
     | '/admin/tournament'
     | '/admin/voucher'
@@ -525,6 +537,13 @@ declare module '@tanstack/react-router' {
       path: '/reservasi'
       fullPath: '/admin/reservasi'
       preLoaderRoute: typeof AdminReservasiRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/redeem': {
+      id: '/admin/redeem'
+      path: '/redeem'
+      fullPath: '/admin/redeem'
+      preLoaderRoute: typeof AdminRedeemRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/program': {
@@ -884,6 +903,7 @@ interface AdminRouteChildren {
   AdminPengaturanRoute: typeof AdminPengaturanRoute
   AdminPenggunaRoute: typeof AdminPenggunaRouteWithChildren
   AdminProgramRoute: typeof AdminProgramRoute
+  AdminRedeemRoute: typeof AdminRedeemRoute
   AdminReservasiRoute: typeof AdminReservasiRouteWithChildren
   AdminTournamentRoute: typeof AdminTournamentRouteWithChildren
   AdminVoucherRoute: typeof AdminVoucherRouteWithChildren
@@ -901,6 +921,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminPengaturanRoute: AdminPengaturanRoute,
   AdminPenggunaRoute: AdminPenggunaRouteWithChildren,
   AdminProgramRoute: AdminProgramRoute,
+  AdminRedeemRoute: AdminRedeemRoute,
   AdminReservasiRoute: AdminReservasiRouteWithChildren,
   AdminTournamentRoute: AdminTournamentRouteWithChildren,
   AdminVoucherRoute: AdminVoucherRouteWithChildren,

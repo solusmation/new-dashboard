@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { CalendarIcon, AlertTriangle, ChevronRight } from "lucide-react";
-import { getBookingOverlaps, getCourtBookingsForScheduleDay } from "@/lib/admin-data.functions";
+import { getCourtBookingsForScheduleDay } from "@/lib/admin-data.functions";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -47,11 +47,7 @@ function ReservasiOpsPage() {
   const [courtFilter, setCourtFilter] = useState<string>("all");
   const [calOpen, setCalOpen] = useState(false);
 
-  const overlapFrom = selectedDate;
-  const overlapTo = selectedDate;
-
   const fetchDay = useServerFn(getCourtBookingsForScheduleDay);
-  const fetchOverlaps = useServerFn(getBookingOverlaps);
 
   const courtNum = courtFilter === "all" ? undefined : Number(courtFilter);
 
@@ -66,13 +62,9 @@ function ReservasiOpsPage() {
       }),
   });
 
-  const { data: ovData, isLoading: ovLoad } = useQuery({
-    queryKey: ["admin", "bookings", "overlaps", overlapFrom, overlapTo],
-    queryFn: () => fetchOverlaps({ data: { from: overlapFrom, to: overlapTo } }),
-  });
-
   const rows = dayData?.rows ?? [];
-  const overlaps = ovData?.overlaps ?? [];
+  const overlaps = dayData?.overlaps ?? [];
+  const ovLoad = dayLoad;
 
   const blocks = useMemo(
     () =>

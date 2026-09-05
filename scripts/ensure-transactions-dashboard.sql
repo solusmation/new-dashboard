@@ -1,5 +1,5 @@
 -- Catatan: Project dashboard-padel (Supabase terhubung) memakai tabel `transaksi` dan `refund`, BUKAN `payment_ledger`.
--- Skrip ini hanya untuk lingkungan yang masih memakai pola Lovable + `payment_ledger` + `transactions` (EN).
+-- Skrip ini hanya untuk lingkungan yang masih memakai pola legacy + `payment_ledger` + `transactions` (EN).
 -- Jalankan hanya jika tabel `payment_ledger` ada: `supabase db query --linked -f scripts/ensure-transactions-dashboard.sql`
 
 create table if not exists public.transactions (

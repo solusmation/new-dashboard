@@ -73,12 +73,6 @@ export function TournamentBracketTab({ tournamentId, matches }: Props) {
     onSuccess: () => {
       toast.success("Posisi tim di bracket diperbarui.");
       void queryClient.invalidateQueries({ queryKey: ["admin", "tournament", tournamentId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["admin", "tournament", tournamentId, "schedule"],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ["admin", "tournament", tournamentId, "standings"],
-      });
     },
     onError: (e) => toast.error((e as Error).message),
   });

@@ -69,7 +69,6 @@ export function SuperadminActionsBar({
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["admin", "tournament", tournamentId] });
-    void queryClient.invalidateQueries({ queryKey: ["admin", "tournament", tournamentId, "schedule"] });
     void queryClient.invalidateQueries({ queryKey: ["admin", "tournaments", "list"] });
   };
 

@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSuperadminAuth } from "@/lib/admin-superadmin-middleware";
-import { assertSuperadmin } from "@/lib/admin-superadmin-guard";
 import { fetchAuthMetaForUserIds } from "@/lib/auth-user-meta.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
@@ -137,8 +136,6 @@ export const saveCoachWeeklySchedule = createServerFn({ method: "POST" })
   .middleware([requireSuperadminAuth])
   .inputValidator((input) => scheduleSchema.parse(input))
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
-
     const weeklyHours = data.weeklyHours.map((d) => ({
       day_of_week: d.day_of_week,
       start_time: d.start_time.length === 5 ? `${d.start_time}:00` : d.start_time,
@@ -191,8 +188,6 @@ export const updateCoachProfile = createServerFn({ method: "POST" })
   .middleware([requireSuperadminAuth])
   .inputValidator((input) => coachProfileSchema.parse(input))
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
-
     const { data: existing, error: findErr } = await supabaseAdmin
       .from("coaches")
       .select("id, avatar_storage_path")
@@ -244,7 +239,6 @@ export const uploadCoachAvatar = createServerFn({ method: "POST" })
       .parse(input ?? {}),
   )
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
     const bucket = "coach-assets";
     const ext = (data.fileName.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
     const path = `avatars/${data.coachId}/${Date.now()}.${ext}`;
@@ -267,7 +261,6 @@ export const toggleCoachSlotOverride = createServerFn({ method: "POST" })
   .middleware([requireSuperadminAuth])
   .inputValidator((input) => slotSchema.parse(input))
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
     const startTime = data.startTime.length === 5 ? `${data.startTime}:00` : data.startTime;
     const { error } = await supabaseAdmin.rpc("admin_toggle_coach_slot_override", {
       p_instructor_id: data.coachId,
@@ -339,8 +332,6 @@ export const deleteCoachBooking = createServerFn({ method: "POST" })
     z.object({ bookingId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
-
     const { data: booking, error: findErr } = await supabaseAdmin
       .from("coach_bookings")
       .select("id, court_booking_id")
@@ -379,8 +370,6 @@ export const adminCreateCoachBooking = createServerFn({ method: "POST" })
   .middleware([requireSuperadminAuth])
   .inputValidator((input) => adminBookCoachSchema.parse(input))
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
-
     const { data: coach, error: coachErr } = await supabaseAdmin
       .from("coaches")
       .select("id, user_id, hourly_rate_idr")
@@ -428,8 +417,6 @@ export const deleteCoachById = createServerFn({ method: "POST" })
   .middleware([requireSuperadminAuth])
   .inputValidator((input) => coachIdSchema.parse(input))
   .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.userId);
-
     const { data: row, error: findErr } = await supabaseAdmin
       .from("coaches")
       .select("id, user_id, display_name")

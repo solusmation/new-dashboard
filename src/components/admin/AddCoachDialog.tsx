@@ -57,8 +57,7 @@ export function AddCoachDialog() {
       setOpen(false);
       setUserId("");
       void queryClient.invalidateQueries({ queryKey: ["admin", "coaches"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "instructors"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "users", "list"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

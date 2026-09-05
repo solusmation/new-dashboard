@@ -230,8 +230,6 @@ export function TournamentTeamApprovals({ tournamentId, teamSlots, approvedCount
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["admin", "tournament", tournamentId] });
-    void queryClient.invalidateQueries({ queryKey: ["admin", "tournament", tournamentId, "teams"] });
-    void queryClient.invalidateQueries({ queryKey: ["admin", "tournament", tournamentId, "standings"] });
   };
 
   const review = useMutation({
